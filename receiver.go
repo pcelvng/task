@@ -22,7 +22,10 @@ type Receiver interface {
 	// then Next() should return an error describing the problem.
 	// If the receiver lost a connection to the task bus then
 	// it should try to re-connect before returning an error.
-	Next() (*Task, error)
+	//
+	// A receiver may communicate a message is the last one
+	// by returning 'last' as true.
+	Next() (tsk *Task, last bool, err error)
 
 	// Done will accept a task and send it back to the
 	// task bus.
@@ -35,4 +38,13 @@ type Receiver interface {
 
 	// Close cleanly disconnects from the task bus.
 	Close() error
+}
+
+// NoTasksError should be returned by a receiver
+// when Next() is called and it is known that there are
+// no more Tasks available.
+type NoTasksError struct {}
+
+func (e *NoTasksError) Error() string {
+	return "task queue empty"
 }

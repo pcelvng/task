@@ -179,7 +179,7 @@ func (t *Task) IsErr() bool {
 // - A Task with a error result should have an error message
 // - A Task with a result should have non-zero started and completed dates
 // - A Task without a result should have a zero value completed date and error message
-func (t *Task) Valid(ttype string) error {
+func (t *Task) Valid(taskType string) error {
 	errMsg := ""
 
 	// Has Task.Type
@@ -189,8 +189,8 @@ func (t *Task) Valid(ttype string) error {
 	}
 
 	// Task.Type matches desired task type
-	if ttype != "" && (t.Type != ttype) {
-		errMsg = fmt.Sprintf("task type is '%v' but needs to be '%v'", t.Type, ttype)
+	if taskType != "" && (t.Type != taskType) {
+		errMsg = fmt.Sprintf("task type is '%v' but needs to be '%v'", t.Type, taskType)
 		return &InvalidError{msg: errMsg}
 	}
 
@@ -209,7 +209,7 @@ func (t *Task) Valid(ttype string) error {
 	// Empty result validation
 	if t.Result == Result("") {
 		// Have zero-value completed
-		if t.Timestamp != nil && !t.Completed.IsZero() {
+		if t.Completed != nil && !t.Completed.IsZero() {
 			errMsg = "task has no result so should not have a completed date"
 			return &InvalidError{msg: errMsg}
 		}

@@ -218,6 +218,112 @@ func TestNewFromBytesErr(t *testing.T) {
 	}
 }
 
+func TestTask_Valid(t *testing.T) {
+	// setup
+	ttask := &Task{}
+	now := time.Now()
+
+	// empty task is not valid
+	if ttask.Valid("") == nil {
+		t.Errorf("empty task should not be valid")
+	}
+
+	// just Task.Type is not valid
+	ttask.Type = "testtype"
+	if ttask.Valid("") == nil {
+		t.Errorf("valid task should require at least a type, task and timestamp")
+	}
+
+	// just Task.Task is not valid
+	ttask.Type = ""
+	ttask.Task = "testtask"
+	if ttask.Valid("") == nil {
+		t.Errorf("valid task should require at least a type, task and timestamp")
+	}
+
+	// just Task.Timestamp is not valid
+	ttask.Type = ""
+	ttask.Task = ""
+	ttask.Timestamp = &now
+	if ttask.Valid("") == nil {
+		t.Errorf("valid task should require at least a type, task and timestamp")
+	}
+
+	// including type, task and timestamp is valid
+	ttask.Type = "testtype"
+	ttask.Task = "testtask"
+	ttask.Timestamp = &now
+	if ttask.Valid("") != nil {
+		t.Errorf("task should be valid")
+	}
+
+	// if task type is provided then the provided task type
+	// should match the assigned task type.
+	if ttask.Valid("testtype") != nil {
+		t.Errorf("task should be valid")
+	}
+
+	// if task type is provided then the provided task type
+	// should match the assigned task type.
+	if ttask.Valid("different_testtype") == nil {
+		t.Errorf("task should not be valid")
+	}
+
+	// empty result should not have Completed date
+	ttask.Completed = &now
+	if ttask.Valid("") == nil {
+		t.Errorf("task should not be valid")
+	}
+
+	// empty result should have empty error msg
+	ttask.Completed = nil
+	ttask.Msg = "notempty"
+	if ttask.Valid("") == nil {
+		t.Errorf("task should not be valid")
+	}
+
+	// result value should be valid
+	ttask.Result = "invalidresult"
+	if ttask.Valid("") == nil {
+		t.Errorf("task should not be valid")
+	}
+
+	// result value should be valid
+	ttask.Result = CompleteResult
+	ttask.Started = &now
+	ttask.Completed = &now
+	if ttask.Valid("") != nil {
+		t.Errorf("task should be valid")
+	}
+
+	// result value should be valid
+	ttask.Result = ErrResult
+	ttask.Started = &now
+	ttask.Completed = &now
+	ttask.Msg = "testmsg"
+	if ttask.Valid("") != nil {
+		t.Errorf("task should be valid")
+	}
+
+	// error result should have a message
+	ttask.Result = ErrResult
+	ttask.Started = &now
+	ttask.Completed = &now
+	ttask.Msg = ""
+	if ttask.Valid("") == nil {
+		t.Errorf("task should not be valid")
+	}
+}
+
+func TestInvalidError_Error(t *testing.T) {
+	// setup
+	errMsg := "error message"
+	err := &InvalidError{msg: errMsg}
+	if err.Error() != errMsg {
+		t.Errorf("expected '%v' but got '%v'", errMsg, err.Error())
+	}
+}
+
 func TestTask_Bytes(t *testing.T) {
 	// check bytes of task without "omitempty" type fields
 	ttask := &Task{

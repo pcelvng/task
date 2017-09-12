@@ -10,3 +10,4 @@ type Worker interface {
 	Start() error
 	Close() error
 }
+
