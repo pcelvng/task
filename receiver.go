@@ -12,6 +12,11 @@ package task
 // It is not responsible for:
 // - any kind of task validation
 type Receiver interface {
+	// Connect connects to the task bus
+	// but should not retrieve a task until
+	// Next() is called.
+	Connect() error
+
 	// Next Provides another Task if one is
 	// available. Should be lazy loaded, where
 	// applicable, so that other workers of the
@@ -31,11 +36,6 @@ type Receiver interface {
 	// task bus.
 	Done(*Task)
 
-	// Connect connects to the task bus
-	// but should not retrieve a task until
-	// Next() is called.
-	Connect() error
-
 	// Close cleanly disconnects from the task bus.
 	Close() error
 }
@@ -43,7 +43,7 @@ type Receiver interface {
 // NoTasksError should be returned by a receiver
 // when Next() is called and it is known that there are
 // no more Tasks available.
-type NoTasksError struct {}
+type NoTasksError struct{}
 
 func (e *NoTasksError) Error() string {
 	return "task queue empty"
