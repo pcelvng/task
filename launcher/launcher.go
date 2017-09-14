@@ -7,9 +7,9 @@ import (
 )
 
 type Launcher struct {
-	conf     *Config
-	receiver task.Receiver
-	worker   task.Worker
+	conf       *Config
+	receiver   task.Receiver
+	launchFunc task.Launch
 
 	// wg is the wait group for managing in-progress
 	// tasks.
@@ -37,7 +37,7 @@ type Launcher struct {
 
 type Config struct {
 	Receiver    task.Receiver
-	Worker      task.Worker
+	LaunchFunc  task.Launch
 	MaxInFlight int
 }
 
@@ -46,7 +46,7 @@ func New(c *Config) (*Launcher, error) {
 	return &Launcher{
 		conf:        c,
 		receiver:    c.Receiver,
-		worker:      c.Worker,
+		launchFunc:  c.LaunchFunc,
 		maxInFlight: c.MaxInFlight,
 	}, nil
 }
@@ -56,11 +56,6 @@ func New(c *Config) (*Launcher, error) {
 func (l *Launcher) Start() error {
 	// get the receiver ready
 	if err := l.receiver.Connect(); err != nil {
-		return err
-	}
-
-	// get the worker ready
-	if err := l.worker.Start(); err != nil {
 		return err
 	}
 
@@ -121,9 +116,8 @@ func (l *Launcher) next() {
 func (l *Launcher) Close() error {
 	// close the worker first in case
 	// something is being worked on
-	if err := l.worker.Close(); err != nil {
-		return err
-	}
+	// ... handle closing all in-progress
+	// tasks...
 
 	// close the do loop
 	// ...close
