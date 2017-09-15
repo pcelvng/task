@@ -502,7 +502,8 @@ func TestResult_InProgress(t *testing.T) {
 	}
 
 	// complete the task - should no longer be in progress
-	ttask.Complete()
+	msg := ""
+	ttask.Complete(msg)
 	if ttask.InProgress() {
 		t.Error("task should not be marked as in progress")
 	}
@@ -535,7 +536,8 @@ func TestResult_Complete(t *testing.T) {
 	ttask := New("test_type", "test_task")
 
 	// test that the Task is completed
-	completedAt := ttask.Complete()
+	msg := ""
+	completedAt := ttask.Complete(msg)
 	if ttask.Completed == nil || ttask.Completed.IsZero() {
 		t.Errorf("task should have a non-zero completed value")
 	}
@@ -546,7 +548,7 @@ func TestResult_Complete(t *testing.T) {
 	}
 
 	// check that the Completed value doesn't change with another call
-	sameCompletedAt := ttask.Complete()
+	sameCompletedAt := ttask.Complete(msg)
 	if !completedAt.Equal(sameCompletedAt) {
 		t.Errorf("expected '%v' but got '%v'", sameCompletedAt, completedAt)
 	}
@@ -568,6 +570,23 @@ func TestResult_Complete(t *testing.T) {
 	if ttask.Msg != "" {
 		t.Errorf("expected '%v' but got '%v'", "", ttask.Msg)
 	}
+
+	// check that the Complete msg is set correctly
+	// and doesn't change with subsequent calls.
+	ttask = New("test_type", "test_task")
+	msg = "test msg"
+	ttask.Complete(msg)
+	if ttask.Msg != msg {
+		t.Errorf("expected '%v' but got '%v'", msg, ttask.Msg)
+	}
+
+	// test subsequent call does not change the msg.
+	msg = "new test msg"
+	ttask.Complete(msg)
+	if ttask.Msg == msg {
+		t.Errorf("expected '%v' but got '%v'", msg, ttask.Msg)
+	}
+
 }
 
 func TestResult_IsCompleted(t *testing.T) {
@@ -586,7 +605,8 @@ func TestResult_IsCompleted(t *testing.T) {
 	}
 
 	// complete the task - should be completed now
-	ttask.Complete()
+	msg := ""
+	ttask.Complete(msg)
 	if !ttask.IsCompleted() {
 		t.Error("task should be marked as completed")
 	}
@@ -630,7 +650,8 @@ func TestResult_IsErr(t *testing.T) {
 		t.Error("task should not be marked as completed")
 	}
 
-	ttask.Complete()
+	msg := ""
+	ttask.Complete(msg)
 	// should still not be marked as completed
 	if ttask.IsCompleted() {
 		t.Error("task should not be marked as completed")
@@ -675,7 +696,8 @@ func TestResult_Err(t *testing.T) {
 	}
 
 	// calling Complete() should not change anything
-	ttask.Complete()
+	msg := ""
+	ttask.Complete(msg)
 
 	// should still be the same original datetime
 	if !completedAt.Equal(sameCompletedAt) {

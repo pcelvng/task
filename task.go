@@ -38,7 +38,7 @@ func NewFromBytes(b []byte) (*Task, error) {
 // directly.
 type Task struct {
 	// Core Task parameters
-	Type      string     `json:"type"`
+	Type      string     `json:"type"` // "audit.fb.api"
 	Task      string     `json:"task"`
 	Timestamp *time.Time `json:"timestamp,omitempty"`
 
@@ -108,10 +108,13 @@ func (t *Task) InProgress() bool {
 // but it is safe to do so. Doing so will not update the Completed timestamp on
 // the Task.
 //
+// Unlike Err, the Complete 'msg' is optional.
+//
 // It is bad practice to call both the Complete() and Err() Task methods.
-func (t *Task) Complete() time.Time {
+func (t *Task) Complete(msg string) time.Time {
 	if t.Completed == nil || t.Completed.IsZero() {
 		t.Result = CompleteResult
+		t.Msg = msg
 		now := time.Now()
 		t.Completed = &now
 	}
@@ -278,4 +281,5 @@ func (t Result) Valid() bool {
 const (
 	CompleteResult Result = "complete" // completed successfully as far as the worker can tell
 	ErrResult      Result = "error"    // the task was unable to be completed successfully
+
 )
