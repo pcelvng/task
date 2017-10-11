@@ -9,17 +9,53 @@ import (
 
 	"github.com/bitly/go-nsq"
 	"github.com/pcelvng/task"
+	"os"
 )
 
+// startup will try to start nsq. If successful
+// then nsqOn will be set to true.
+var (
+	nsqdOn = false
+	nsqdCmd *exec.Cmd
+	lookupdOn = false
+	lookupdCmd *exec.Cmd
+)
+
+
+func TestMain(m *testing.M) {
+	// start nsqd
+	err := StartNsqd()
+	if err != nil {
+		fmt.Printf("unable to start nsq: %v", err.Error())
+		os.Exit(1)
+	}
+	nsqdOn = true
+
+	// start lookupd
+	err = StartLookupd()
+	if err != nil {
+		fmt.Printf("unable to start lookupd: %v", err.Error())
+	}
+	lookupdOn = true
+
+	exitCode := m.Run()
+	StopLookupd()
+	StopNsqd()
+	os.Exit(exitCode)
+}
+
 func TestNewConsumer(t *testing.T) {
-	conf := &ConsumerConfig{
+	conf := &LazyConsumerConfig{
 		Topic:            "testtopic",
 		Channel:          "testchannel",
-		NSQdTCPAddrs:     []string{"localhost:4151"},
-		LookupdHTTPAddrs: []string{"localhost:4150"},
+		NSQdTCPAddrs:     []string{"localhost:4150"},
+		LookupdHTTPAddrs: []string{"localhost:4160"},
 	}
 
-	consumer := NewConsumer(conf)
+	consumer, err := NewLazyConsumer(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// check consumer
 	if consumer == nil {
@@ -30,6 +66,17 @@ func TestNewConsumer(t *testing.T) {
 	if consumer.conf.Topic != conf.Topic {
 		t.Errorf("expected topic '%v' but got '%v'", conf.Topic, consumer.conf.Topic)
 	}
+
+	// Create Test Consumer
+	//conf := &LazyConsumerConfig{
+	//	Topic:        "test-nsqconsumer",
+	//	Channel:      "test-chan-nsqconsumer",
+	//	NSQdTCPAddrs: []string{"localhost:4150"},
+	//}
+	//cons, err := NewLazyConsumer(conf)
+	//if err != nil {
+	//	return err
+	//}
 }
 
 // TestConsumerNSQd will do a full test of this module.
@@ -38,38 +85,44 @@ func TestNewConsumer(t *testing.T) {
 // Tests:
 // - Connects to local nsqd
 func TestConsumerNSQd(t *testing.T) {
+
+
+}
+
+func StartNsqd() error {
 	// check for nsqd in the path
 	_, err := exec.LookPath("nsqd")
 	if err != nil {
-		return // don't attempt full tests
+		return err // don't attempt full tests
 	}
 
 	// start nsqd
-	cmd := exec.Command("nsqd")
+	cmd := exec.Command(
+		"nsqd",
+		"--lookupd-tcp-address=127.0.0.1:4160",
+		"--http-address=127.0.0.1:4151",
+		"--tcp-address=127.0.0.1:4150",
+		"--broadcast-address=127.0.0.1",
+	)
 	cmd.Start()
-	defer cmd.Process.Signal(syscall.SIGINT)
-
-	// Create Test Consumer
-	conf := &ConsumerConfig{
-		Topic:        "test-nsqconsumer",
-		Channel:      "test-chan-nsqconsumer",
-		NSQdTCPAddrs: []string{"localhost:4150"},
-	}
-	cons := NewConsumer(conf)
+	nsqdCmd = cmd
 
 	// wait a sec to connect
 	time.Sleep(time.Second * 2)
 
-	// test Connect
-	nsqCons, err := cons.Connect()
-	defer nsqCons.Stop()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
+	return nil
+}
+
+func StopNsqd() {
+	nsqdCmd.Process.Signal(syscall.SIGINT)
+}
+
+func StartLookupd() {
+	// nsqlookupd --broadcast-address=127.0.0.1
 
 }
 
-func NSQSimpleTaskProducer(topic string, tskCnt int) error {
+func NsqSimpleTaskProducer(topic string, tskCnt int) error {
 	// create nsq consumer config
 	nsqConf := nsq.NewConfig()
 	producer, err := nsq.NewProducer("localhost:4150", nsqConf)

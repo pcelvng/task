@@ -1,33 +1,57 @@
 package nsqbus
 
 import (
+	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 
 	nsq "github.com/bitly/go-nsq"
 )
 
-func NewConsumer(c *ConsumerConfig) *Consumer {
+func NewLazyConsumer(c *LazyConsumerConfig) (*LazyConsumer, error) {
+	// initialized at 0 to pause reading on startup
+	maxInFlight := 0
+
 	// create nsq consumer config
 	nsqConf := nsq.NewConfig()
-	nsqConf.MaxInFlight = 1 // 1 to prevent greedy reading
+	nsqConf.MaxInFlight = maxInFlight
 
-	return &Consumer{
-		conf:    c,
-		nsqConf: nsqConf,
+	// create context
+	cntxt := context.Context{}
+
+	lc := &LazyConsumer{
+		conf:        c,
+		nsqConf:     nsqConf,
+		maxInFlight: maxInFlight,
 	}
+
+	// attempt to connect to nsq
+	nsqC, err := lc.connect()
+	if err != nil {
+		return nil, err
+	}
+
+	lc.consumer = nsqC
+
+	return lc, nil
 }
 
-type ConsumerConfig struct {
+type LazyConsumerConfig struct {
 	Topic            string
 	Channel          string
 	NSQdTCPAddrs     []string
 	LookupdHTTPAddrs []string
 }
 
-type Consumer struct {
-	conf    *ConsumerConfig
-	nsqConf *nsq.Config
+type LazyConsumer struct {
+	conf     *LazyConsumerConfig
+	nsqConf  *nsq.Config
+	consumer *nsq.Consumer
+	cntxt    context.Context
+
+	// maxInFlight is managed so that messages are lazy loaded
+	maxInFlight int64
 
 	// bytes are assumed serializable as a valid Task
 	// msgChan should be created with a consumer and should never be closed.
@@ -40,26 +64,20 @@ type Consumer struct {
 	// wait group is to make sure all consumers are closed during
 	// a shutdown.
 	sync.WaitGroup
+
+	// mutex for updating consumer maxInFlight
+	sync.Mutex
 }
 
-// Connect will connect nsq. An error is returned if there
+// connect will connect nsq. An error is returned if there
 // is a problem connecting.
-// - will create a one-time-use consumer that will disconnect
-//   after reading exactly one message.
-//
-// Performance Note: if the ecosystem has a lot of nsqd instances this may take much more time.
-// thus it is recommended to have an nsq topology that does not have too many instances
-// of nsqd registered with the lookupds.
-func (c *Consumer) Connect() (*nsq.Consumer, error) {
+func (c *LazyConsumer) connect() (*nsq.Consumer, error) {
 	// initialize nsq consumer - does not connect
 	consumer, err := nsq.NewConsumer(c.conf.Topic, c.conf.Channel, c.nsqConf)
 	if err != nil {
 		return nil, err
 	}
 
-	// add handler - only good until the consumer is closed.
-	// the way this is implemented the consumer is closed after 1
-	// message is received to prevent a greedy consumer.
 	consumer.AddHandler(c)
 
 	// attempt to connect to nsqds (if provided)
@@ -77,7 +95,28 @@ func (c *Consumer) Connect() (*nsq.Consumer, error) {
 	return consumer, nil
 }
 
-func (c *Consumer) HandleMessage(msg *nsq.Message) error {
+// inMaxInFlight will increment the consumer maxInFlight
+// value by 1
+func (c *LazyConsumer) incMaxInFlight() {
+	c.Lock()
+	atomic.AddInt64(&c.maxInFlight, 1)
+	c.consumer.ChangeMaxInFlight(c.maxInFlight)
+	c.Unlock()
+}
+
+// decMaxInFlight will decrement the consumer maxInFlight
+// value by 1
+func (c *LazyConsumer) decMaxInFlight() {
+	c.Lock()
+	atomic.AddInt64(&c.maxInFlight, -1)
+	c.consumer.ChangeMaxInFlight(c.maxInFlight)
+	c.Unlock()
+}
+
+func (c *LazyConsumer) HandleMessage(msg *nsq.Message) error {
+	// decrement maxInFlight on exit
+	defer c.decMaxInFlight()
+
 	body := msg.Body
 
 	// the message should be ready to accept immediately
@@ -96,36 +135,15 @@ func (c *Consumer) HandleMessage(msg *nsq.Message) error {
 
 // Msg will block until it receives one and only one message.
 //
-// To prevent getting more than one message at a time Msg will
-// initialize a new nsq consumer and then shut the consumer down
-// after one message is received.
-//
-// Msg is safe to call concurrently. Note that each concurrent call
-// will still setup and take down a consumer.
-func (c *Consumer) Msg() ([]byte, error) {
+// Msg is safe to call concurrently.
+func (c *LazyConsumer) Msg() ([]byte, error) {
 	// increment wait group
 	c.Add(1)
 	defer c.Done()
 
-	consumer, err := c.Connect()
-	if err != nil {
-		return nil, err
-	}
+	c.incMaxInFlight()
 
 	// wait for a message
-	// Note: all messages are passed on the same
-	// channel so if Msg is called more than once
-	// then the message that comes in could be from
-	// a different consumer instance. This shouldn't
-	// really be a problem. It just means that an nsq
-	// consumer could get created and not actually read
-	// in a message before being shut down. Then the
-	// consumer that read in the first message will
-	// continue waiting until another message is read
-	// in.
-	//
-	// The important thing is to have message control.
-	// A single message per Msg call.
 	msgBytes := make([]byte, 0)
 	select {
 	case msgBytes = <-c.msgChan:
@@ -134,23 +152,19 @@ func (c *Consumer) Msg() ([]byte, error) {
 		break
 	}
 
-	// close down the consumer - don't use this consumer again.
-	consumer.Stop()
-
-	// receive on StopChan to wait until consumer is completely shutdown
-	// will make sure in-flight messages are re-queued cleanly.
-	<-consumer.StopChan
-
 	return msgBytes, nil
 }
 
-// Close will close down all in-process activity.
-// Consumer should not be used after calling Close.
-//
-// Calling Close a second time will cause a panic.
-func (c *Consumer) Close() error {
+// Close will close down all in-process activity
+// and the nsq consumer.
+func (c *LazyConsumer) Close() error {
+	// close out all work in progress
 	close(c.closeChan)
 	c.Wait()
+
+	// stop the consumer
+	c.consumer.Stop()
+	<-c.consumer.StopChan // wait for consumer to finish closing
 
 	return nil
 }
