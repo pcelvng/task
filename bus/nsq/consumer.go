@@ -1,8 +1,8 @@
 package nsqbus
 
 import (
-	"context"
 	"errors"
+	"log"
 	"sync"
 	"sync/atomic"
 
@@ -17,38 +17,35 @@ func NewLazyConsumer(c *LazyConsumerConfig) (*LazyConsumer, error) {
 	nsqConf := nsq.NewConfig()
 	nsqConf.MaxInFlight = maxInFlight
 
-	// create context
-	cntxt := context.Context{}
-
 	lc := &LazyConsumer{
 		conf:        c,
 		nsqConf:     nsqConf,
-		maxInFlight: maxInFlight,
+		maxInFlight: int64(maxInFlight),
+		closeChan:   make(chan interface{}),
+		msgChan:     make(chan []byte),
 	}
-
-	// attempt to connect to nsq
-	nsqC, err := lc.connect()
-	if err != nil {
-		return nil, err
-	}
-
-	lc.consumer = nsqC
 
 	return lc, nil
 }
 
 type LazyConsumerConfig struct {
-	Topic            string
-	Channel          string
-	NSQdTCPAddrs     []string
-	LookupdHTTPAddrs []string
+	Topic        string
+	Channel      string
+	NSQdAddrs    []string // connects via TCP only
+	LookupdAddrs []string // connects via HTTP only
+
+	// if nil then the default nsq logger is used
+	Logger *log.Logger
+
+	// default is nsq.LogLevelInfo. Only set if a
+	// custom logger is provided.
+	LogLvl nsq.LogLevel
 }
 
 type LazyConsumer struct {
 	conf     *LazyConsumerConfig
 	nsqConf  *nsq.Config
 	consumer *nsq.Consumer
-	cntxt    context.Context
 
 	// maxInFlight is managed so that messages are lazy loaded
 	maxInFlight int64
@@ -59,7 +56,7 @@ type LazyConsumer struct {
 
 	// close signal to shut down Consumer. Will stop any in-process messages
 	// (messages are re-queued). Will also shutdown any open nsq consumers.
-	closeChan chan int
+	closeChan chan interface{}
 
 	// wait group is to make sure all consumers are closed during
 	// a shutdown.
@@ -71,28 +68,44 @@ type LazyConsumer struct {
 
 // connect will connect nsq. An error is returned if there
 // is a problem connecting.
-func (c *LazyConsumer) connect() (*nsq.Consumer, error) {
+func (c *LazyConsumer) Connect() error {
 	// initialize nsq consumer - does not connect
 	consumer, err := nsq.NewConsumer(c.conf.Topic, c.conf.Channel, c.nsqConf)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	// set custom logger
+	if c.conf.Logger != nil {
+		consumer.SetLogger(c.conf.Logger, c.conf.LogLvl)
 	}
 
 	consumer.AddHandler(c)
 
-	// attempt to connect to nsqds (if provided)
-	err = consumer.ConnectToNSQDs(c.conf.NSQdTCPAddrs)
-	if err != nil {
-		return nil, err
-	}
-
 	// attempt to connect to lookupds (if provided)
-	err = consumer.ConnectToNSQLookupds(c.conf.LookupdHTTPAddrs)
-	if err != nil {
-		return nil, err
+	// or attempt to connect to nsqds (if provided)
+	// if neither is provided attempt to connect to localhost
+	if len(c.conf.LookupdAddrs) > 0 {
+		err = consumer.ConnectToNSQLookupds(c.conf.LookupdAddrs)
+		if err != nil {
+			return err
+		}
+	} else if len(c.conf.NSQdAddrs) > 0 {
+		err = consumer.ConnectToNSQDs(c.conf.NSQdAddrs)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = consumer.ConnectToNSQD("localhost:4150")
+		if err != nil {
+			return err
+		}
 	}
 
-	return consumer, nil
+	// update nsq consumer
+	c.consumer = consumer
+
+	return nil
 }
 
 // inMaxInFlight will increment the consumer maxInFlight
@@ -100,7 +113,7 @@ func (c *LazyConsumer) connect() (*nsq.Consumer, error) {
 func (c *LazyConsumer) incMaxInFlight() {
 	c.Lock()
 	atomic.AddInt64(&c.maxInFlight, 1)
-	c.consumer.ChangeMaxInFlight(c.maxInFlight)
+	c.consumer.ChangeMaxInFlight(int(c.maxInFlight))
 	c.Unlock()
 }
 
@@ -109,7 +122,7 @@ func (c *LazyConsumer) incMaxInFlight() {
 func (c *LazyConsumer) decMaxInFlight() {
 	c.Lock()
 	atomic.AddInt64(&c.maxInFlight, -1)
-	c.consumer.ChangeMaxInFlight(c.maxInFlight)
+	c.consumer.ChangeMaxInFlight(int(c.maxInFlight))
 	c.Unlock()
 }
 
@@ -118,12 +131,13 @@ func (c *LazyConsumer) HandleMessage(msg *nsq.Message) error {
 	defer c.decMaxInFlight()
 
 	body := msg.Body
-
+	log.Printf("have body: '%v'", string(body))
 	// the message should be ready to accept immediately
 	// or else the calling application risks that the message
 	// reaches the timeout limit and is re-queued.
 	select {
 	case c.msgChan <- body:
+		log.Println("body was passed")
 		return nil // successful - will ack the message as finished
 	case <-c.closeChan:
 		err := errors.New("nsq consumer shut down before the message was read in")
@@ -147,9 +161,9 @@ func (c *LazyConsumer) Msg() ([]byte, error) {
 	msgBytes := make([]byte, 0)
 	select {
 	case msgBytes = <-c.msgChan:
-		break
+		return msgBytes, nil
 	case <-c.closeChan:
-		break
+		return nil, nil
 	}
 
 	return msgBytes, nil
@@ -163,8 +177,10 @@ func (c *LazyConsumer) Close() error {
 	c.Wait()
 
 	// stop the consumer
-	c.consumer.Stop()
-	<-c.consumer.StopChan // wait for consumer to finish closing
+	if c.consumer != nil {
+		c.consumer.Stop()
+		<-c.consumer.StopChan // wait for consumer to finish closing
+	}
 
 	return nil
 }
