@@ -131,13 +131,11 @@ func (c *LazyConsumer) HandleMessage(msg *nsq.Message) error {
 	defer c.decMaxInFlight()
 
 	body := msg.Body
-	log.Printf("have body: '%v'", string(body))
 	// the message should be ready to accept immediately
 	// or else the calling application risks that the message
 	// reaches the timeout limit and is re-queued.
 	select {
 	case c.msgChan <- body:
-		log.Println("body was passed")
 		return nil // successful - will ack the message as finished
 	case <-c.closeChan:
 		err := errors.New("nsq consumer shut down before the message was read in")

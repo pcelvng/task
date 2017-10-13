@@ -12,6 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"sync"
+
+	"encoding/json"
+	"net/http"
+
 	"github.com/bitly/go-nsq"
 	"github.com/pcelvng/task"
 )
@@ -375,14 +380,16 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	// TEST MSG
 	//
 	// - Should not load any messages upon connecting
-	// - Should lazy load a message.
+	// - Should lazy load a message
 	// - Should retrieve only one message per call
 	// - Should not have messages in flight when Msg
-	// has not been called.
+	// has not been called
+	// - Should be able to handle multiple concurrent Msg()
+	// calls.
 
 	// load the topic with messages.
 	topic := "testtopic"
-	msgCnt := 5
+	msgCnt := 1000
 	AddTasks(topic, msgCnt)
 
 	// turn off nsq client logging
@@ -462,11 +469,85 @@ func TestLazyConsumer_Msg(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesRequeued)
 	}
 
+	// TEST CONCURRENT CALLS
+	//
+	// Create a bunch of go channels that will wait until
+	// releaseChan is closed and then all call Msg() at
+	// the same time.
+	msgCnt = 100 // cnt of messages retrieved. Less than total messages loaded to topic.
+	releaseChan := make(chan interface{})
+	msgChan := make(chan []byte, msgCnt) // buffered chan to store the msgs
+	errChan := make(chan error, msgCnt)
+	wg := sync.WaitGroup{}
+	for i := 0; i < msgCnt; i++ {
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
+			<-releaseChan
+
+			b, err := lc.Msg()
+			if err != nil {
+				errChan <- err
+			}
+			msgChan <- b
+		}()
+	}
+
+	// close channel to release all the Msg() calls
+	close(releaseChan)
+
+	// wait for all messages to complete
+	wg.Wait()
+
+	// count the errors (should be zero)
+	expected = 0
+	errCnt := 0
+	for range errChan {
+		errCnt++
+	}
+	if errCnt > expected {
+		t.Errorf("expected '%v' but got '%v'\n", expected, errCnt)
+	}
+
+	// count the messages (should match total number of Msg() calls)
+	expected = msgCnt
+	gotMsgCnt := 0
+	for range msgChan {
+		gotMsgCnt++
+	}
+	if gotMsgCnt != expected {
+		t.Errorf("expected '%v' msgs but got '%v'\n", expected, gotMsgCnt)
+	}
+
+	// check the consumer stats again
+	stats = lc.consumer.Stats()
+
+	// messages finished
+	expected = 1 + msgCnt
+	if stats.MessagesFinished != uint64(expected) {
+		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesFinished)
+	}
+
+	// received messages
+	expected = 1 + msgCnt
+	if stats.MessagesReceived != uint64(expected) {
+		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesReceived)
+	}
+
+	// no re-queued messages
+	expected = 0
+	if stats.MessagesRequeued != uint64(expected) {
+		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesRequeued)
+	}
+
+	// check nsqd stats
+
 	// check that consumer shuts down safely - even without
 	// successfully connecting
 	if err := lc.Close(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
+
 }
 
 func StartNsqd() error {
@@ -573,4 +654,50 @@ func AddTasks(topic string, tskCnt int) error {
 	}
 
 	return nil
+}
+
+func getNSQdStats(topic, channel string) (*NsqdStats, error) {
+	resp, err := http.Get("http://localhost:4151/stats?format=json")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+
+	// deserialize JSON
+	stats := &NsqdStats{}
+	if err := json.Unmarshal(body, stats); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
+type NsqdStats struct {
+	Version   string `json:"version"`
+	Health    string `json:"health"`
+	StartTime int    `json:"start_time"`
+	Topics    []struct {
+		TopicName            string        `json:"topic_name"`
+		Channels             []interface{} `json:"channels"`
+		Depth                int           `json:"depth"`
+		BackendDepth         int           `json:"backend_depth"`
+		MessageCount         int           `json:"message_count"`
+		Paused               bool          `json:"paused"`
+		E2EProcessingLatency struct {
+			Count       int         `json:"count"`
+			Percentiles interface{} `json:"percentiles"`
+		} `json:"e2e_processing_latency"`
+	} `json:"topics"`
+	Memory struct {
+		HeapObjects       int `json:"heap_objects"`
+		HeapIdleBytes     int `json:"heap_idle_bytes"`
+		HeapInUseBytes    int `json:"heap_in_use_bytes"`
+		HeapReleasedBytes int `json:"heap_released_bytes"`
+		GcPauseUsec100    int `json:"gc_pause_usec_100"`
+		GcPauseUsec99     int `json:"gc_pause_usec_99"`
+		GcPauseUsec95     int `json:"gc_pause_usec_95"`
+		NextGcBytes       int `json:"next_gc_bytes"`
+		GcTotalRuns       int `json:"gc_total_runs"`
+	} `json:"memory"`
 }
