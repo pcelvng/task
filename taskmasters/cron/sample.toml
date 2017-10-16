@@ -1,0 +1,56 @@
+task_bus = "stdout" # "stdout" (default), "file", "nsq"
+
+# "file" task bus options
+file_path = "path/to/file.json" # absolute or relative
+
+# "stdout" task bus options
+# no extra config
+
+# "nsq" task bus options
+nsqd_hosts = ["localhost:4150","localhost:4250"] # nsqd hosts - only accepts tcp port
+lookupd_hosts = ["localhost:4161","localhost:4261"] # lookupd hosts - only accepts http port
+
+# series of task building rules
+[[rule]]
+cron_rule = "* * * * *" # second minute hour mday month wday
+
+# note: for the nsq bus type the topic will
+# be the same value as the task_type.
+task_type = "task-type"
+
+# task_value can accept any string and supports the following
+# datetime formating:
+#
+# {yyyy} (year - four digits: ie 2017)
+# {yy}   (year - two digits: ie 17)
+# {mm}   (month - two digits: ie 12)
+# {hh}   (hour - two digits: ie 00
+#
+# Note: only supports 24 hour (military time) and always reported in
+# UTC. Does not support higher granularity than hour.
+task_value = "{yyyy}-{mm}-{dd}:{hh}" # ie 2001-09-11
+
+# offset in hours from the moment of creation
+# if task runs at "2017-01-04T14:15" and the offset is -1
+# then the task_value datetime would reflect "2017-01-04T13:00".
+# Can accept a positive of negative value.
+hour_offset = -1
+
+# Sample Rule Set
+#[[rule]]
+#cron_rule = "05 01 * * * *"
+#task_type = "task-type-1"
+#task_value = "{yyyy}-{mm}-{dd}"
+#hour_offset = -2
+#
+#[[rule]]
+#cron_rule = "05 * * * * *"
+#task_type = "task-type-2"
+#task_value = "{yyyy}-{mm}-{dd}:{hh}"
+#hour_offset = -2
+#
+#[[rule]]
+#cron_rule = "10 05 * * * *"
+#task_type = "task-type-3"
+#task_value = "prefix:{yyyy}/{mm}/{dd}/{hh}"
+#hour_offset = -2

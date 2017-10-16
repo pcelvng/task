@@ -2,20 +2,19 @@ package nsqbus
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
-
-	"sync"
-
-	"encoding/json"
-	"net/http"
 
 	"github.com/bitly/go-nsq"
 	"github.com/pcelvng/task"
@@ -29,6 +28,15 @@ var (
 	logBuf     *bytes.Buffer // copy of buffer from changing log output
 )
 
+// TestMain will setup nsqd and lookupd. It expects those two binaries
+// to exist in PATH or the tests will fail.
+//
+// WEIRD ISSUE: when I run this test in Gogland the then switch
+// to a terminal to curl nsqd (to check the stats) or visa versa then
+// sometimes the test run will freeze for a long time and then fail with
+// very strange results.
+// This did not happen in doing the same thing between two terminal
+// instances.
 func TestMain(m *testing.M) {
 	// start lookupd
 	err := StartLookupd()
@@ -448,6 +456,9 @@ func TestLazyConsumer_Msg(t *testing.T) {
 		t.Errorf("expected some bytes but didn't any")
 	}
 
+	tckr := time.NewTicker(time.Millisecond * 50)
+	<-tckr.C
+
 	// check that there is a connection
 	stats = lc.consumer.Stats()
 
@@ -469,27 +480,85 @@ func TestLazyConsumer_Msg(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesRequeued)
 	}
 
+	// TEST SERIAL CALLS
+	//
+	// Make a bunch of serial calls to test against
+	// getting into a bad state.
+	serialMsgCnt := 100
+	errCntGot := int64(0)
+	msgCntGot := int64(0)
+	for i := 0; i < serialMsgCnt; i++ {
+
+		b, err := lc.Msg()
+		if err != nil {
+			atomic.AddInt64(&errCntGot, 1)
+		} else if len(b) > 0 {
+			atomic.AddInt64(&msgCntGot, 1)
+		} else {
+			t.Fatalf("msg has zero byte length '%v'\n", string(b))
+		}
+
+		tckr = time.NewTicker(time.Millisecond * 2)
+		<-tckr.C
+	}
+
+	expected = 0
+	if int(errCntGot) != expected {
+		t.Errorf("got '%v' errs but expected '%v'", errCntGot, expected)
+	}
+
+	expected = serialMsgCnt
+	if int(msgCntGot) != expected {
+		t.Errorf("got '%v' msgs but expected '%v'", msgCntGot, expected)
+	}
+
+	// check the consumer stats again
+	tckr = time.NewTicker(time.Millisecond * 5)
+	<-tckr.C
+	stats = lc.consumer.Stats()
+
+	// messages finished
+	expected = 1 + serialMsgCnt
+	if stats.MessagesFinished != uint64(expected) {
+		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesFinished)
+	}
+
+	// received messages
+	expected = 1 + serialMsgCnt
+	if stats.MessagesReceived != uint64(expected) {
+		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesReceived)
+	}
+
+	// no re-queued messages
+	maxExpected := 1
+	if stats.MessagesRequeued > uint64(maxExpected) {
+		t.Errorf("expected at most '%v' but got '%v'", maxExpected, stats.MessagesRequeued)
+	}
+
 	// TEST CONCURRENT CALLS
 	//
 	// Create a bunch of go channels that will wait until
 	// releaseChan is closed and then all call Msg() at
 	// the same time.
-	msgCnt = 100 // cnt of messages retrieved. Less than total messages loaded to topic.
+	pMsgCnt := 300 // cnt of messages retrieved. Less than total messages loaded to topic.
 	releaseChan := make(chan interface{})
-	msgChan := make(chan []byte, msgCnt) // buffered chan to store the msgs
-	errChan := make(chan error, msgCnt)
+	errCntGot = int64(0)
+	msgCntGot = int64(0)
 	wg := sync.WaitGroup{}
-	for i := 0; i < msgCnt; i++ {
+	for i := 0; i < pMsgCnt; i++ {
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 			<-releaseChan
 
 			b, err := lc.Msg()
 			if err != nil {
-				errChan <- err
+				atomic.AddInt64(&errCntGot, 1)
+			} else if len(b) > 0 {
+				atomic.AddInt64(&msgCntGot, 1)
+			} else {
+				t.Fatalf("msg has zero byte length '%v'\n", string(b))
 			}
-			msgChan <- b
 		}()
 	}
 
@@ -499,46 +568,42 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	// wait for all messages to complete
 	wg.Wait()
 
-	// count the errors (should be zero)
 	expected = 0
-	errCnt := 0
-	for range errChan {
-		errCnt++
-	}
-	if errCnt > expected {
-		t.Errorf("expected '%v' but got '%v'\n", expected, errCnt)
+	if int(errCntGot) != expected {
+		t.Errorf("got '%v' errs but expected '%v'", errCntGot, expected)
 	}
 
-	// count the messages (should match total number of Msg() calls)
-	expected = msgCnt
-	gotMsgCnt := 0
-	for range msgChan {
-		gotMsgCnt++
-	}
-	if gotMsgCnt != expected {
-		t.Errorf("expected '%v' msgs but got '%v'\n", expected, gotMsgCnt)
+	expected = pMsgCnt
+	if int(msgCntGot) != expected {
+		t.Errorf("got '%v' msgs but expected '%v'", msgCntGot, expected)
 	}
 
 	// check the consumer stats again
+	tckr = time.NewTicker(time.Millisecond * 5)
+	<-tckr.C
 	stats = lc.consumer.Stats()
 
 	// messages finished
-	expected = 1 + msgCnt
+	expected = 1 + pMsgCnt + serialMsgCnt
 	if stats.MessagesFinished != uint64(expected) {
 		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesFinished)
 	}
 
 	// received messages
-	expected = 1 + msgCnt
+	expected = 1 + pMsgCnt + serialMsgCnt
 	if stats.MessagesReceived != uint64(expected) {
 		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesReceived)
 	}
 
 	// no re-queued messages
-	expected = 0
-	if stats.MessagesRequeued != uint64(expected) {
-		t.Errorf("expected '%v' but got '%v'", expected, stats.MessagesRequeued)
+	maxExpected = 1
+	if stats.MessagesRequeued > uint64(maxExpected) {
+		t.Errorf("expected at most '%v' but got '%v'", maxExpected, stats.MessagesRequeued)
 	}
+
+	log.Println("check stats")
+	tckr = time.NewTicker(time.Second * 2)
+	<-tckr.C
 
 	// check nsqd stats
 
@@ -569,8 +634,8 @@ func StartNsqd() error {
 	nsqdCmd = cmd
 
 	// wait a sec for nsqd to start up
-	time.Sleep(time.Millisecond * 500)
-
+	tckr := time.NewTicker(time.Millisecond * 50)
+	<-tckr.C
 	return nil
 }
 
@@ -612,7 +677,8 @@ func StartLookupd() error {
 	lookupdCmd = cmd
 
 	// wait a for lookupd to start up
-	time.Sleep(time.Millisecond * 500)
+	tckr := time.NewTicker(time.Millisecond * 50)
+	<-tckr.C
 
 	return nil
 }
