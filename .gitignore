@@ -13,3 +13,10 @@
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 .idea/
+
+# binaries
+taskmasters/backloader/backloader
+taskmasters/cron/cron
+taskmasters/http/http
+taskmasters/responder/responder
+taskmasters/retry/retry

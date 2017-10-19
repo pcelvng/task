@@ -8,6 +8,6 @@ type Consumer interface {
 
 type Producer interface {
 	Connect() error
-	Msg(topic string, msg []byte) error
+	Send(topic string, msg []byte) error
 	Close() error
 }
