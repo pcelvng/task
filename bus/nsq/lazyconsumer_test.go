@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -18,14 +19,6 @@ import (
 
 	"github.com/bitly/go-nsq"
 	"github.com/pcelvng/task"
-)
-
-// startup will try to start nsq. If successful
-// then nsqOn will bej set to true.
-var (
-	nsqdCmd    *exec.Cmd
-	lookupdCmd *exec.Cmd
-	logBuf     *bytes.Buffer // copy of buffer from changing log output
 )
 
 // TestMain will setup nsqd and lookupd. It expects those two binaries
@@ -59,6 +52,19 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+// startup will try to start nsq. If successful
+// then nsqOn will bej set to true.
+var (
+	nsqdCmd    *exec.Cmd
+	lookupdCmd *exec.Cmd
+	logBuf     *bytes.Buffer // copy of buffer from changing log output
+
+	nsqdPath             = "./test/nsqd"
+	nsqlookupdPath       = "./test/nsqlookupd"
+	darwinNsqdPath       = "./test/darwin_nsqd"
+	darwinNsqlookupdPath = "./test/darwin_nsqlookupd"
+)
+
 func logCaptureStart() {
 	var buf bytes.Buffer
 
@@ -76,7 +82,7 @@ func logCaptureStop() *bytes.Buffer {
 func TestNewConsumer(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:   "testtopic",
 		Channel: "testchannel",
 		// Logger:       logger,
@@ -127,7 +133,7 @@ func TestNewConsumer(t *testing.T) {
 func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:   "",
 		Channel: "testchannel",
 		// Logger:       logger,
@@ -161,7 +167,7 @@ func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:   "testtopic",
 		Channel: "",
 		// Logger:       logger,
@@ -194,7 +200,7 @@ func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
 func TestLazyConsumer_Connect(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:   "testtopic",
 		Channel: "testchannel",
 		Logger:  logger,
@@ -228,7 +234,7 @@ func TestLazyConsumer_ConnectNSQdsBad(t *testing.T) {
 	// TEST BAD NSQD
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:     "testtopic",
 		Channel:   "testchannel",
 		Logger:    logger,
@@ -262,7 +268,7 @@ func TestLazyConsumer_ConnectNSQds(t *testing.T) {
 	// TEST GOOD NSQD
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:     "testtopic",
 		Channel:   "testchannel",
 		Logger:    logger,
@@ -301,7 +307,7 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:   "testtopic",
 		Channel: "testchannel",
 		Logger:  logger,
@@ -347,7 +353,7 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:   "testtopic",
 		Channel: "testchannel",
 		Logger:  logger,
@@ -402,7 +408,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &LazyConsumerConfig{
+	conf := &Config{
 		Topic:   topic,
 		Channel: "testchannel",
 		Logger:  logger,
@@ -446,7 +452,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	}
 
 	// get one message
-	b, err := lc.Msg()
+	b, _, err := lc.Msg()
 	if err != nil {
 		t.Errorf("expected nil but got '%v'", err.Error())
 	}
@@ -489,7 +495,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	msgCntGot := int64(0)
 	for i := 0; i < serialMsgCnt; i++ {
 
-		b, err := lc.Msg()
+		b, _, err := lc.Msg()
 		if err != nil {
 			atomic.AddInt64(&errCntGot, 1)
 		} else if len(b) > 0 {
@@ -551,7 +557,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 			defer wg.Done()
 			<-releaseChan
 
-			b, err := lc.Msg()
+			b, _, err := lc.Msg()
 			if err != nil {
 				atomic.AddInt64(&errCntGot, 1)
 			} else if len(b) > 0 {
@@ -601,12 +607,6 @@ func TestLazyConsumer_Msg(t *testing.T) {
 		t.Errorf("expected at most '%v' but got '%v'", maxExpected, stats.MessagesRequeued)
 	}
 
-	log.Println("check stats")
-	tckr = time.NewTicker(time.Second * 2)
-	<-tckr.C
-
-	// check nsqd stats
-
 	// check that consumer shuts down safely - even without
 	// successfully connecting
 	if err := lc.Close(); err != nil {
@@ -617,7 +617,12 @@ func TestLazyConsumer_Msg(t *testing.T) {
 
 func StartNsqd() error {
 	// check for nsqd in the path
-	_, err := exec.LookPath("nsqd")
+	var err error
+	if runtime.GOOS == "darwin" {
+		_, err = exec.LookPath(darwinNsqdPath)
+	} else {
+		_, err = exec.LookPath(nsqdPath)
+	}
 	if err != nil {
 		return err // don't attempt full tests
 	}
@@ -662,8 +667,13 @@ func StopNsqd() error {
 }
 
 func StartLookupd() error {
-	// check for nsqd in the path
-	_, err := exec.LookPath("nsqlookupd")
+	// check for nsqlookupd in the path
+	var err error
+	if runtime.GOOS == "darwin" {
+		_, err = exec.LookPath(darwinNsqlookupdPath)
+	} else {
+		_, err = exec.LookPath(nsqlookupdPath)
+	}
 	if err != nil {
 		return err // don't attempt full tests
 	}

@@ -2,7 +2,7 @@ package bus
 
 type Consumer interface {
 	Connect() error
-	Msg() ([]byte, error)
+	Msg() (msg []byte, done bool, err error)
 	Close() error
 }
 

@@ -1,14 +1,13 @@
 package nsqbus
 
 import (
-	"log"
 	"sync"
 	"sync/atomic"
 
 	nsq "github.com/bitly/go-nsq"
 )
 
-func NewLazyConsumer(c *LazyConsumerConfig) (*LazyConsumer, error) {
+func NewLazyConsumer(c *Config) (*LazyConsumer, error) {
 	// initialized at 0 to pause reading on startup
 	maxInFlight := 0
 
@@ -26,22 +25,8 @@ func NewLazyConsumer(c *LazyConsumerConfig) (*LazyConsumer, error) {
 	return lc, nil
 }
 
-type LazyConsumerConfig struct {
-	Topic        string
-	Channel      string
-	NSQdAddrs    []string // connects via TCP only
-	LookupdAddrs []string // connects via HTTP only
-
-	// if nil then the default nsq logger is used
-	Logger *log.Logger
-
-	// default is nsq.LogLevelInfo. Only set if a
-	// custom logger is provided.
-	LogLvl nsq.LogLevel
-}
-
 type LazyConsumer struct {
-	conf     *LazyConsumerConfig
+	conf     *Config
 	nsqConf  *nsq.Config
 	consumer *nsq.Consumer
 
@@ -183,14 +168,13 @@ func (c *LazyConsumer) HandleMessage(msg *nsq.Message) error {
 // Msg will block until it receives one and only one message.
 //
 // Msg is safe to call concurrently.
-func (c *LazyConsumer) Msg() ([]byte, error) {
+func (c *LazyConsumer) Msg() (msg []byte, done bool, err error) {
 	c.reqMsg() // request message
 
 	// wait for a message
-	msgBytes := make([]byte, 0)
-	msgBytes = <-c.msgChan
+	msg = <-c.msgChan
 
-	return msgBytes, nil
+	return msg, done, err
 }
 
 // Close will close down all in-process activity

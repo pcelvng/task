@@ -20,3 +20,6 @@ taskmasters/cron/cron
 taskmasters/http/http
 taskmasters/responder/responder
 taskmasters/retry/retry
+
+# development debris
+bus/nsq/*.dat
