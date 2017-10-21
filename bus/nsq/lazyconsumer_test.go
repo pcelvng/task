@@ -1,7 +1,6 @@
 package nsqbus
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -39,7 +38,6 @@ func TestMain(m *testing.M) {
 	}
 
 	// start nsqd
-	// todo: require nsqd and lookupd to function for travis integration
 	err = StartNsqd()
 	if err != nil {
 		fmt.Printf("unable to start nsq: %v\n", err.Error())
@@ -57,27 +55,12 @@ func TestMain(m *testing.M) {
 var (
 	nsqdCmd    *exec.Cmd
 	lookupdCmd *exec.Cmd
-	logBuf     *bytes.Buffer // copy of buffer from changing log output
 
 	nsqdPath             = "./test/nsqd"
 	nsqlookupdPath       = "./test/nsqlookupd"
 	darwinNsqdPath       = "./test/darwin_nsqd"
 	darwinNsqlookupdPath = "./test/darwin_nsqlookupd"
 )
-
-func logCaptureStart() {
-	var buf bytes.Buffer
-
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	logBuf = &buf
-}
-
-func logCaptureStop() *bytes.Buffer {
-	log.SetOutput(os.Stderr)
-	log.SetFlags(log.LstdFlags)
-	return logBuf
-}
 
 func TestNewConsumer(t *testing.T) {
 	// turn off nsq client logging
@@ -161,7 +144,6 @@ func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 	if err := lc.Close(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
-
 }
 
 func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
@@ -462,7 +444,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 		t.Errorf("expected some bytes but didn't any")
 	}
 
-	tckr := time.NewTicker(time.Millisecond * 50)
+	tckr := time.NewTicker(time.Millisecond * 10)
 	<-tckr.C
 
 	// check that there is a connection
@@ -494,7 +476,6 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	errCntGot := int64(0)
 	msgCntGot := int64(0)
 	for i := 0; i < serialMsgCnt; i++ {
-
 		b, _, err := lc.Msg()
 		if err != nil {
 			atomic.AddInt64(&errCntGot, 1)
@@ -503,9 +484,6 @@ func TestLazyConsumer_Msg(t *testing.T) {
 		} else {
 			t.Fatalf("msg has zero byte length '%v'\n", string(b))
 		}
-
-		tckr = time.NewTicker(time.Millisecond * 2)
-		<-tckr.C
 	}
 
 	expected = 0
@@ -648,9 +626,7 @@ func StopNsqd() error {
 	if nsqdCmd != nil {
 		nsqdCmd.Process.Signal(syscall.SIGINT)
 	}
-	if err := nsqdCmd.Wait(); err != nil {
-		return err
-	}
+	nsqdCmd.Wait()
 
 	// remove .dat files
 	matches, err := filepath.Glob("*.dat")

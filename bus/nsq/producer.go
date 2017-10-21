@@ -38,11 +38,16 @@ func (p *Producer) Connect() error {
 				return err
 			}
 
+			// set custom logger
+			if p.conf.Logger != nil {
+				producer.SetLogger(p.conf.Logger, p.conf.LogLvl)
+			}
+
 			// check that producer has good host
-			//err = producer.Ping()
-			//if err != nil {
-			//	return err
-			//}
+			err = producer.Ping()
+			if err != nil {
+				return err
+			}
 
 			pk := strconv.Itoa(i) + "|" + host
 			producers[pk] = producer
