@@ -7,12 +7,9 @@ import (
 )
 
 func TestStdoutProducer(t *testing.T) {
-	p, err := NewStdoutProducer()
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'", err.Error())
-	}
+	p := NewStdoutProducer()
 
-	err = p.Connect()
+	err := p.Connect()
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'", err.Error())
 	}
@@ -59,4 +56,3 @@ func TestStdoutProducer(t *testing.T) {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
 }
-

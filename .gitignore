@@ -21,5 +21,6 @@ taskmasters/http/http
 taskmasters/responder/responder
 taskmasters/retry/retry
 
-# development debris
+# development and usage debris
 bus/nsq/*.dat
+taskmasters/cron/*.json

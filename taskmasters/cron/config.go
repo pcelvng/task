@@ -11,11 +11,10 @@ type Config struct {
 	FilePath string `toml:"file_path"`
 
 	// "nsq" bus options
-	NsqdHosts    []string `toml:"nsqd_hosts"`
-	LookupdHosts []string `toml:"lookupd_hosts"`
+	NsqdHosts []string `toml:"nsqd_hosts"`
 
 	// rules
-	Rules []Rule `toml:"rule"`
+	Rules []*Rule `toml:"rule"`
 }
 
 type Rule struct {
@@ -23,6 +22,7 @@ type Rule struct {
 	TaskType   string `toml:"task_type"`
 	TaskValue  string `toml:"task_value"`
 	HourOffset int    `toml:"hour_offset"`
+	Topic      string `toml:"topic"`
 }
 
 func LoadConfig(filePath string) (*Config, error) {

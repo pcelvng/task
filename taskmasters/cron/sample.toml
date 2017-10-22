@@ -1,14 +1,15 @@
-task_bus = "stdout" # "stdout" (default), "file", "nsq"
+task_bus = "stdout" # "" (stdout), "stdout" (default), "file", "nsq"
 
 # "file" task bus options
-file_path = "path/to/file.json" # absolute or relative
+# note: the taskmaster will truncate the file if it already
+# exists.
+file_path = "./tasks.json" # absolute or relative
 
 # "stdout" task bus options
 # no extra config
 
 # "nsq" task bus options
-nsqd_hosts = ["localhost:4150","localhost:4250"] # nsqd hosts - only accepts tcp port
-lookupd_hosts = ["localhost:4161","localhost:4261"] # lookupd hosts - only accepts http port
+nsqd_hosts = ["localhost:4150"] # nsqd hosts - only accepts tcp port
 
 # series of task building rules
 [[rule]]
@@ -24,7 +25,8 @@ task_type = "task-type"
 # {yyyy} (year - four digits: ie 2017)
 # {yy}   (year - two digits: ie 17)
 # {mm}   (month - two digits: ie 12)
-# {hh}   (hour - two digits: ie 00
+# {dd}   (day - two digits: ie 13)
+# {hh}   (hour - two digits: ie 00)
 #
 # Note: only supports 24 hour (military time) and always reported in
 # UTC. Does not support higher granularity than hour.
@@ -36,12 +38,17 @@ task_value = "{yyyy}-{mm}-{dd}:{hh}" # ie 2001-09-11
 # Can accept a positive of negative value.
 hour_offset = -1
 
+# topic is not requred and if not specified will default to
+# the value of "task_type".
+#topic = "task-topic"
+
 # Sample Rule Set
 #[[rule]]
 #cron_rule = "05 01 * * * *"
 #task_type = "task-type-1"
 #task_value = "{yyyy}-{mm}-{dd}"
 #hour_offset = -2
+#topic = "topic-override-1"
 #
 #[[rule]]
 #cron_rule = "05 * * * * *"

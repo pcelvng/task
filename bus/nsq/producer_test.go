@@ -1,4 +1,4 @@
-package nsqbus
+package nsq
 
 import (
 	"io/ioutil"

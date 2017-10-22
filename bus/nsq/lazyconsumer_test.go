@@ -1,4 +1,4 @@
-package nsqbus
+package nsq
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bitly/go-nsq"
+	gonsq "github.com/bitly/go-nsq"
 	"github.com/pcelvng/task"
 )
 
@@ -683,9 +683,9 @@ func StopLookupd() error {
 
 func AddTasks(topic string, tskCnt int) error {
 	// create nsq consumer config
-	nsqConf := nsq.NewConfig()
+	nsqConf := gonsq.NewConfig()
 
-	producer, err := nsq.NewProducer("localhost:4150", nsqConf)
+	producer, err := gonsq.NewProducer("localhost:4150", nsqConf)
 	if err != nil {
 		return err
 	}
@@ -693,7 +693,7 @@ func AddTasks(topic string, tskCnt int) error {
 
 	// disable logging
 	logger := log.New(ioutil.Discard, "", 0)
-	producer.SetLogger(logger, nsq.LogLevelInfo)
+	producer.SetLogger(logger, gonsq.LogLevelInfo)
 
 	// create tasks and publish
 	body := make([]byte, 0)

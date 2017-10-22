@@ -7,11 +7,11 @@ import (
 	"sync"
 )
 
-func NewStdoutProducer() (*Producer, error) {
+func NewStdoutProducer() *Producer {
 	return &Producer{
 		writeCloser: os.Stdout,
 		writer:      bufio.NewWriter(os.Stdout),
-	}, nil
+	}
 }
 
 func NewFileProducer(path string) (*Producer, error) {

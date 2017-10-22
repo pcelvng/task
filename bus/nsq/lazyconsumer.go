@@ -1,10 +1,10 @@
-package nsqbus
+package nsq
 
 import (
 	"sync"
 	"sync/atomic"
 
-	nsq "github.com/bitly/go-nsq"
+	gonsq "github.com/bitly/go-nsq"
 )
 
 func NewLazyConsumer(c *Config) (*LazyConsumer, error) {
@@ -12,7 +12,7 @@ func NewLazyConsumer(c *Config) (*LazyConsumer, error) {
 	maxInFlight := 0
 
 	// create nsq consumer config
-	nsqConf := nsq.NewConfig()
+	nsqConf := gonsq.NewConfig()
 	nsqConf.MaxInFlight = maxInFlight
 
 	lc := &LazyConsumer{
@@ -27,8 +27,8 @@ func NewLazyConsumer(c *Config) (*LazyConsumer, error) {
 
 type LazyConsumer struct {
 	conf     *Config
-	nsqConf  *nsq.Config
-	consumer *nsq.Consumer
+	nsqConf  *gonsq.Config
+	consumer *gonsq.Consumer
 
 	// msgRequested and msgReceived is necessary for lazy
 	// loading b/c of the delay in communicating with nsqd
@@ -56,7 +56,7 @@ type LazyConsumer struct {
 // is a problem connecting.
 func (c *LazyConsumer) Connect() error {
 	// initialize nsq consumer - does not connect
-	consumer, err := nsq.NewConsumer(c.conf.Topic, c.conf.Channel, c.nsqConf)
+	consumer, err := gonsq.NewConsumer(c.conf.Topic, c.conf.Channel, c.nsqConf)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (c *LazyConsumer) recMsg() bool {
 	return true // message was received
 }
 
-func (c *LazyConsumer) HandleMessage(msg *nsq.Message) error {
+func (c *LazyConsumer) HandleMessage(msg *gonsq.Message) error {
 	msg.DisableAutoResponse()
 	body := msg.Body
 

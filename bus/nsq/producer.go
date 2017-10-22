@@ -1,39 +1,43 @@
-package nsqbus
+package nsq
 
 import (
 	"errors"
 	"strconv"
+	"sync"
 
 	"github.com/bitly/go-hostpool"
-	nsq "github.com/bitly/go-nsq"
+	gonsq "github.com/bitly/go-nsq"
 )
 
 func NewProducer(c *Config) *Producer {
 	return &Producer{
 		conf:     c,
-		nsqConf:  nsq.NewConfig(),
-		numConns: 3,
+		nsqConf:  gonsq.NewConfig(),
+		numConns: 1,
 	}
 }
 
 type Producer struct {
 	conf      *Config
-	nsqConf   *nsq.Config
-	producers map[string]*nsq.Producer
+	nsqConf   *gonsq.Config
+	producers map[string]*gonsq.Producer
 	hostPool  hostpool.HostPool
 
 	// number connections to each nsqd
 	numConns int
+
+	// mutex for hostpool access
+	sync.Mutex
 }
 
 // Connect will connect to all the nsqds
 // specified in Config.
 func (p *Producer) Connect() error {
 	// make the producers
-	producers := make(map[string]*nsq.Producer)
+	producers := make(map[string]*gonsq.Producer)
 	for _, host := range p.conf.NSQdAddrs {
 		for i := 0; i < p.numConns; i++ {
-			producer, err := nsq.NewProducer(host, p.nsqConf)
+			producer, err := gonsq.NewProducer(host, p.nsqConf)
 			if err != nil {
 				return err
 			}

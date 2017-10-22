@@ -1,9 +1,9 @@
-package nsqbus
+package nsq
 
 import (
 	"log"
 
-	nsq "github.com/bitly/go-nsq"
+	gonsq "github.com/bitly/go-nsq"
 )
 
 // Config is used for instantiating an NSQ Consumer or
@@ -19,5 +19,5 @@ type Config struct {
 
 	// default is nsq.LogLevelInfo. Only set if a
 	// custom logger is provided.
-	LogLvl nsq.LogLevel
+	LogLvl gonsq.LogLevel
 }
