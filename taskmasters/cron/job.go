@@ -47,7 +47,7 @@ func (j *Job) fmtTask() string {
 
 	// substitute year {yyyy}
 	y := strconv.Itoa(offsetTime.Year())
-	s := strings.Replace(j.TaskFormat, "{yyyy}", y, -1)
+	s := strings.Replace(j.TaskTemplate, "{yyyy}", y, -1)
 
 	// substitute year {yy}
 	s = strings.Replace(s, "{yy}", y[2:], -1)

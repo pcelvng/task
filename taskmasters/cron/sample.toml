@@ -19,7 +19,7 @@ cron_rule = "* * * * *" # second minute hour mday month wday
 # be the same value as the task_type.
 task_type = "task-type"
 
-# task_format can accept any string and supports the following
+# task_template can accept any string and supports the following
 # datetime formating:
 #
 # {yyyy} (year - four digits: ie 2017)
@@ -30,11 +30,11 @@ task_type = "task-type"
 #
 # Note: only supports 24 hour (military time) and always reported in
 # UTC. Does not support higher granularity than hour.
-task_format = "{yyyy}-{mm}-{dd}:{hh}" # ie 2001-09-11
+task_template = "{yyyy}-{mm}-{dd}:{hh}" # ie 2001-09-11
 
 # offset in hours from the moment of creation
 # if task runs at "2017-01-04T14:15" and the offset is -1
-# then the task_format datetime would reflect "2017-01-04T13:00".
+# then the task_template datetime would reflect "2017-01-04T13:00".
 # Can accept a positive of negative value.
 hour_offset = -1
 
@@ -46,18 +46,18 @@ hour_offset = -1
 #[[rule]]
 #cron_rule = "05 01 * * * *"
 #task_type = "task-type-1"
-#task_format = "{yyyy}-{mm}-{dd}"
+#task_template = "{yyyy}-{mm}-{dd}"
 #hour_offset = -2
 #topic = "topic-override-1"
 #
 #[[rule]]
 #cron_rule = "05 * * * * *"
 #task_type = "task-type-2"
-#task_format = "{yyyy}-{mm}-{dd}:{hh}"
+#task_template = "{yyyy}-{mm}-{dd}:{hh}"
 #hour_offset = -2
 #
 #[[rule]]
 #cron_rule = "10 05 * * * *"
 #task_type = "task-type-3"
-#task_format = "prefix:{yyyy}/{mm}/{dd}/{hh}"
+#task_template = "prefix:{yyyy}/{mm}/{dd}/{hh}"
 #hour_offset = -2

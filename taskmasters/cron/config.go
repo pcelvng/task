@@ -18,11 +18,11 @@ type Config struct {
 }
 
 type Rule struct {
-	CronRule   string `toml:"cron_rule"`
-	TaskType   string `toml:"task_type"`
-	TaskFormat string `toml:"task_format"`
-	HourOffset int    `toml:"hour_offset"`
-	Topic      string `toml:"topic"`
+	CronRule     string `toml:"cron_rule"`
+	TaskType     string `toml:"task_type"`
+	TaskTemplate string `toml:"task_template"`
+	HourOffset   int    `toml:"hour_offset"`
+	Topic        string `toml:"topic"`
 }
 
 func LoadConfig(filePath string) (*Config, error) {
