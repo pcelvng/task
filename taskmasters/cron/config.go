@@ -20,7 +20,7 @@ type Config struct {
 type Rule struct {
 	CronRule   string `toml:"cron_rule"`
 	TaskType   string `toml:"task_type"`
-	TaskValue  string `toml:"task_value"`
+	TaskFormat string `toml:"task_format"`
 	HourOffset int    `toml:"hour_offset"`
 	Topic      string `toml:"topic"`
 }
