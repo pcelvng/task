@@ -30,7 +30,7 @@ func main() {
 	c.TaskTemplate = *taskTemplate
 	c.SkipXHours = int(*skipXHours)
 	c.Topic = *topic
-	c.BusType = *taskBus
+	c.OutBusType = *taskBus
 	c.WritePath = *filePath
 	c.NsqdHostsString(*nsqdHosts)
 	if err := c.OnHoursString(*onHours); err != nil {

@@ -1,4 +1,4 @@
-# task_bus = "" # "" (stdout), "stdout" (default), "file", "nsq"
+# out_bus = "" # "" (stdout), "stdout" (default), "file", "nsq"
 
 # "file" task bus options
 # default = "./output-tasks.json"

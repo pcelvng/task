@@ -35,7 +35,8 @@ type BusesConfig struct {
 	// - "stdin"
 	// - "file"
 	// - "nsq"
-	BusType string `toml:"task_bus"`
+	InBusType  string `toml:"in_bus"`
+	OutBusType string `toml:"out_bus"`
 
 	// for "file" bus type
 	WritePath string `toml:"write_file"` // for file producer
@@ -58,7 +59,7 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 	var p bus.Producer
 	var err error
 
-	switch conf.BusType {
+	switch conf.OutBusType {
 	case "stdout", "":
 		p = iobus.NewStdoutProducer()
 		break
@@ -89,7 +90,7 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 	default:
 		return nil, errors.New(fmt.Sprintf(
 			"task bus '%v' not supported - choices are 'stdout', 'file' or 'nsq'",
-			conf.BusType,
+			conf.OutBusType,
 		))
 	}
 
@@ -109,7 +110,7 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 	var c bus.Consumer
 	var err error
 
-	switch conf.BusType {
+	switch conf.InBusType {
 	case "stdin", "":
 		c = iobus.NewStdinConsumer()
 		break
@@ -142,7 +143,7 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 	default:
 		return nil, errors.New(fmt.Sprintf(
 			"task bus '%v' not supported - choices are 'stdin', 'file' or 'nsq'",
-			conf.BusType,
+			conf.InBusType,
 		))
 	}
 
