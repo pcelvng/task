@@ -12,8 +12,7 @@ import (
 	"github.com/robfig/cron"
 
 	"github.com/pcelvng/task/bus"
-	iobus "github.com/pcelvng/task/bus/io"
-	nsqbus "github.com/pcelvng/task/bus/nsq"
+	"github.com/pcelvng/task/util"
 )
 
 var config = flag.String("config", "", "relative or absolute file path")
@@ -32,13 +31,13 @@ func main() {
 	}
 
 	// make producer
-	p, err := MakeProducer(conf)
+	p, err := util.NewProducer(conf.ProducersConfig)
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)
 	}
 
-	// setup cron jobs and start the cron clock
+	// setup cron jobs
 	c, err := MakeCron(conf.Rules, p)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -72,46 +71,6 @@ func main() {
 
 		os.Exit(0)
 	}
-}
-
-// MakeProducer will attempt to create the desired bus
-// producer and connect the producer so that it is ready to
-// use.
-func MakeProducer(conf *Config) (bus.Producer, error) {
-	// setup bus producer
-	var p bus.Producer
-	var err error
-	switch conf.TaskBus {
-	case "stdout", "":
-		p = iobus.NewStdoutProducer()
-		break
-	case "file":
-		p, err = iobus.NewFileProducer(conf.FilePath)
-		if err != nil {
-			return nil, errors.New(fmt.Sprintf(
-				"err creating file producer: '%v'\n",
-				err.Error(),
-			))
-		}
-		break
-	case "nsq":
-		nsqConf := &nsqbus.Config{}
-		if len(conf.NsqdHosts) == 0 {
-			nsqConf.NSQdAddrs = []string{"localhost:4150"}
-		} else {
-			nsqConf.NSQdAddrs = conf.NsqdHosts
-		}
-
-		p = nsqbus.NewProducer(nsqConf)
-		break
-	default:
-		return nil, errors.New(fmt.Sprintf(
-			"task_bus '%v' not supported - choices are 'stdout', 'file' or 'nsq'",
-			conf.TaskBus,
-		))
-	}
-
-	return p, nil
 }
 
 // MakeCron will create the cron and setup all the cron jobs.

@@ -1,16 +1,11 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pcelvng/task"
 	"github.com/pcelvng/task/bus"
-	iobus "github.com/pcelvng/task/bus/io"
-	nsqbus "github.com/pcelvng/task/bus/nsq"
+	"github.com/pcelvng/task/util"
 )
 
 // NewBackloader will validate the config, create and connect the
@@ -22,7 +17,7 @@ func NewBackloader(conf *Config) (*Backloader, error) {
 	}
 
 	// create producer and connect
-	p, err := MakeProducer(conf)
+	p, err := util.NewProducer(conf.ProducersConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -53,17 +48,18 @@ func (bl *Backloader) Backload() (int, error) {
 	cnt := 0
 	for {
 		// task value
-		tskValue := bl.fmtTask(atHour)
+		tskValue := util.FmtTask(bl.config.TaskTemplate, atHour)
 
 		// create task
 		tsk := task.New(bl.config.TaskType, tskValue)
 
-		// send to bus
+		// normalize topic
 		topic := bl.config.TaskType
 		if bl.config.Topic != "" {
 			topic = bl.config.Topic
 		}
 
+		// send task to task bus
 		msg, err := tsk.Bytes()
 		if err != nil {
 			return cnt, err
@@ -74,7 +70,7 @@ func (bl *Backloader) Backload() (int, error) {
 		}
 		cnt = cnt + 1
 
-		// increment atHour
+		// increment atHour by one hour
 		atHour = atHour.Add(time.Hour)
 
 		// check if the loop is finished
@@ -94,68 +90,4 @@ func (bl *Backloader) Close() error {
 	}
 
 	return nil
-}
-
-func (bl *Backloader) fmtTask(dateHour time.Time) string {
-
-	// substitute year {yyyy}
-	y := strconv.Itoa(dateHour.Year())
-	s := strings.Replace(bl.config.TaskTemplate, "{yyyy}", y, -1)
-
-	// substitute year {yy}
-	s = strings.Replace(s, "{yy}", y[2:], -1)
-
-	// substitute month {mm}
-	m := fmt.Sprintf("%02d", int(dateHour.Month()))
-	s = strings.Replace(s, "{mm}", m, -1)
-
-	// substitute day {dd}
-	d := fmt.Sprintf("%02d", dateHour.Day())
-	s = strings.Replace(s, "{dd}", d, -1)
-
-	// substitute hour {hh}
-	h := fmt.Sprintf("%02d", dateHour.Hour())
-	s = strings.Replace(s, "{hh}", h, -1)
-
-	return s
-}
-
-// MakeProducer will attempt to create the desired bus
-// producer and connect the producer so that it is ready to
-// use.
-func MakeProducer(conf *Config) (bus.Producer, error) {
-	// setup bus producer
-	var p bus.Producer
-	var err error
-	switch conf.TaskBus {
-	case "stdout", "":
-		p = iobus.NewStdoutProducer()
-		break
-	case "file":
-		p, err = iobus.NewFileProducer(conf.FilePath)
-		if err != nil {
-			return nil, errors.New(fmt.Sprintf(
-				"err creating file producer: '%v'\n",
-				err.Error(),
-			))
-		}
-		break
-	case "nsq":
-		nsqConf := &nsqbus.Config{}
-		if len(conf.NsqdHosts) == 0 {
-			nsqConf.NSQdAddrs = []string{"localhost:4150"}
-		} else {
-			nsqConf.NSQdAddrs = conf.NsqdHosts
-		}
-
-		p = nsqbus.NewProducer(nsqConf)
-		break
-	default:
-		return nil, errors.New(fmt.Sprintf(
-			"task_bus '%v' not supported - choices are 'stdout', 'file' or 'nsq'",
-			conf.TaskBus,
-		))
-	}
-
-	return p, nil
 }

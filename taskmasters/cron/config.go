@@ -2,16 +2,18 @@ package main
 
 import (
 	"github.com/BurntSushi/toml"
+
+	"github.com/pcelvng/task/util"
 )
 
+func NewConfig() *Config {
+	return &Config{
+		ProducersConfig: &util.ProducersConfig{},
+	}
+}
+
 type Config struct {
-	TaskBus string `toml:"task_bus"`
-
-	// "file" bus options
-	FilePath string `toml:"file_path"`
-
-	// "nsq" bus options
-	NsqdHosts []string `toml:"nsqd_hosts"`
+	*util.ProducersConfig
 
 	// rules
 	Rules []*Rule `toml:"rule"`
@@ -26,7 +28,7 @@ type Rule struct {
 }
 
 func LoadConfig(filePath string) (*Config, error) {
-	c := &Config{}
+	c := NewConfig()
 
 	if _, err := toml.DecodeFile(filePath, c); err != nil {
 		return nil, err

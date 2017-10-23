@@ -7,18 +7,21 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pcelvng/task/util"
 )
 
+func NewConfig() *Config {
+	return &Config{
+		ProducersConfig: &util.ProducersConfig{},
+	}
+}
+
 type Config struct {
-	Start   time.Time // start of backload
-	End     time.Time // end of backload
-	TaskBus string
+	*util.ProducersConfig
 
-	// for "file" bus type
-	FilePath string
-
-	// for "nsq" bus type
-	NsqdHosts []string
+	Start time.Time // start of backload
+	End   time.Time // end of backload
 
 	Topic        string // topic override (uses 'TaskType' if not provided)
 	TaskType     string

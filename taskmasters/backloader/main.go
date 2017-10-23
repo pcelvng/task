@@ -25,14 +25,13 @@ func main() {
 	flag.Parse()
 
 	// load config
-	c := &Config{
-		TaskBus:      *taskBus,
-		FilePath:     *filePath,
-		TaskType:     *taskType,
-		TaskTemplate: *taskTemplate,
-		SkipXHours:   int(*skipXHours),
-		Topic:        *topic,
-	}
+	c := NewConfig()
+	c.TaskType = *taskType
+	c.TaskTemplate = *taskTemplate
+	c.SkipXHours = int(*skipXHours)
+	c.Topic = *topic
+	c.BusType = *taskBus
+	c.FilePath = *filePath
 	c.NsqdHostsString(*nsqdHosts)
 	if err := c.OnHoursString(*onHours); err != nil {
 		log.Println(err.Error())
