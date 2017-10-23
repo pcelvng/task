@@ -24,3 +24,5 @@ taskmasters/retry/retry
 # development and usage debris
 bus/nsq/*.dat
 taskmasters/cron/*.json
+taskmasters/retry/*.json
+taskmasters/backloader/*.json
