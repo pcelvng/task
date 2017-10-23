@@ -8,10 +8,10 @@ import (
 	"sync"
 )
 
-func NewStdinConsumer() (*Consumer, error) {
+func NewStdinConsumer() *Consumer {
 	return &Consumer{
 		readCloser: os.Stdin,
-	}, nil
+	}
 }
 
 func NewFileConsumer(path string) (*Consumer, error) {

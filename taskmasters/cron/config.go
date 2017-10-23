@@ -8,12 +8,12 @@ import (
 
 func NewConfig() *Config {
 	return &Config{
-		ProducersConfig: &util.ProducersConfig{},
+		BusesConfig: &util.BusesConfig{},
 	}
 }
 
 type Config struct {
-	*util.ProducersConfig
+	*util.BusesConfig
 
 	// rules
 	Rules []*Rule `toml:"rule"`

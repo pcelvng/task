@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// make producer
-	p, err := util.NewProducer(conf.ProducersConfig)
+	p, err := util.NewProducer(conf.BusesConfig)
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)

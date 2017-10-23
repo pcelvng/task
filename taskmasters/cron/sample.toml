@@ -1,23 +1,23 @@
-task_bus = "stdout" # "" (stdout), "stdout" (default), "file", "nsq"
+# task_bus = "" # "" (stdout), "stdout" (default), "file", "nsq"
 
 # "file" task bus options
-# note: the taskmaster will truncate the file if it already
-# exists.
-file_path = "./tasks.json" # absolute or relative
-
-# "stdout" task bus options
-# no extra config
+# default = "./output-tasks.json"
+#
+# NOTE: the file will be truncated if it exists
+#write_file = "./out_tasks.json" # absolute or relative
 
 # "nsq" task bus options
-nsqd_hosts = ["localhost:4150"] # nsqd hosts - only accepts tcp port
+#
+# NOTE: localhost:4150 is used by default
+#nsqd_hosts = ["localhost:4150"] # nsqd hosts - only accepts tcp port
 
 # series of task building rules
 [[rule]]
 cron_rule = "* * * * *" # second minute hour mday month wday
 
-# note: for the nsq bus type the topic will
+# NOTE: for the nsq bus type the topic will
 # be the same value as the task_type.
-task_type = "task-type"
+task_type = "task-type" # REQUIRED
 
 # task_template can accept any string and supports the following
 # datetime formating:
@@ -30,34 +30,37 @@ task_type = "task-type"
 #
 # Note: only supports 24 hour (military time) and always reported in
 # UTC. Does not support higher granularity than hour.
-task_template = "{yyyy}-{mm}-{dd}:{hh}" # ie 2001-09-11
+task_template = "{yyyy}-{mm}-{dd}:{hh}" # REQUIRED
 
 # offset in hours from the moment of creation
 # if task runs at "2017-01-04T14:15" and the offset is -1
 # then the task_template datetime would reflect "2017-01-04T13:00".
 # Can accept a positive of negative value.
-hour_offset = -1
+#
+# Default is 0 (no offset)
+#hour_offset = -1
 
-# topic is not requred and if not specified will default to
+# topic is not required and if not specified will default to
 # the value of "task_type".
 #topic = "task-topic"
 
-# Sample Rule Set
-#[[rule]]
-#cron_rule = "05 01 * * * *"
-#task_type = "task-type-1"
-#task_template = "{yyyy}-{mm}-{dd}"
-#hour_offset = -2
-#topic = "topic-override-1"
+# SAMPLE RULE SET
 #
-#[[rule]]
-#cron_rule = "05 * * * * *"
-#task_type = "task-type-2"
-#task_template = "{yyyy}-{mm}-{dd}:{hh}"
-#hour_offset = -2
-#
-#[[rule]]
-#cron_rule = "10 05 * * * *"
-#task_type = "task-type-3"
-#task_template = "prefix:{yyyy}/{mm}/{dd}/{hh}"
-#hour_offset = -2
+# [[rule]]
+# cron_rule = "05 01 * * * *"
+# task_type = "task-type-1"
+# task_template = "{yyyy}-{mm}-{dd}"
+# hour_offset = -2
+# topic = "topic-override-1"
+
+# [[rule]]
+# cron_rule = "05 * * * * *"
+# task_type = "task-type-2"
+# task_template = "{yyyy}-{mm}-{dd}:{hh}"
+# hour_offset = -2
+
+# [[rule]]
+# cron_rule = "10 05 * * * *"
+# task_type = "task-type-3"
+# task_template = "prefix:{yyyy}/{mm}/{dd}/{hh}"
+# hour_offset = -2

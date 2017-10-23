@@ -12,13 +12,13 @@ var (
 	start        = flag.String("start", "", "format: 'yyyy-mm-ddThh:00' (example: '2017-01-03T01:00')")
 	end          = flag.String("end", "", "same format as start and if not specified will use start and end as the same value")
 	taskBus      = flag.String("task-bus", "stdout", "one of 'stdout', 'file', 'nsq'")
-	filePath     = flag.String("file-path", "./tasks.json", "file bus path and name when 'file' task-bus specified")
+	filePath     = flag.String("file-path", "./out_tasks.json", "file bus path and name when 'file' task-bus specified")
 	nsqdHosts    = flag.String("nsqd-hosts", "localhost:4150", "comma-separated list of nsqd hosts with port")
 	taskType     = flag.String("task-type", "", "req'd: the task type the target worker knows how to accept")
 	taskTemplate = flag.String("task-template", "{yyyy}-{mm}-{dd}T{hh}:00", "task template")
+	topic        = flag.String("topic", "", "default: 'task-type' value. topic to send the task (if applicable)")
 	skipXHours   = flag.Uint("skip-x-hours", 0, "will generate tasks skipping x hours")
 	onHours      = flag.String("on-hours", "", "comma separated list of hours to indicate which hours of a day to backload during a 24 period (each value must be between 0-23). Example '0,4,15' - will only generate tasks on hours 0, 4 and 15")
-	topic        = flag.String("topic", "", "default: 'task-type' value. topic to send the task (if applicable)")
 )
 
 func main() {
@@ -31,7 +31,7 @@ func main() {
 	c.SkipXHours = int(*skipXHours)
 	c.Topic = *topic
 	c.BusType = *taskBus
-	c.FilePath = *filePath
+	c.WritePath = *filePath
 	c.NsqdHostsString(*nsqdHosts)
 	if err := c.OnHoursString(*onHours); err != nil {
 		log.Println(err.Error())

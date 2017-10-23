@@ -12,31 +12,48 @@ import (
 	nsqbus "github.com/pcelvng/task/bus/nsq"
 )
 
-// ProducersConfig is a general config struct that
-// can provides all potential config values for all
-// bus producers. It can be used to dynamically
-// create a producer using
-type ProducersConfig struct {
+var (
+	defaultWritePath = "./out_tasks.json"
+	defaultReadPath  = "./in_tasks.json"
+)
+
+// BusesConfig is a general config struct that
+// provides all potential config values for all
+// bus consumers.
+//
+// It can be used to easily and dynamically create
+// a producer or consumer.
+type BusesConfig struct {
+	// Valid producer values:
+	// - "" (stdout)
+	// - "stdout"
+	// - "file"
+	// - "nsq"
+	//
+	// Valid consumer values:
+	// - "" (stdin)
+	// - "stdin"
+	// - "file"
+	// - "nsq"
 	BusType string `toml:"task_bus"`
 
 	// for "file" bus type
-	FilePath string `toml:"file_path"`
+	WritePath string `toml:"write_file"` // for file producer
+	ReadPath  string `toml:"read_file"`  // for file consumer
 
 	// for "nsq" bus type
-	NsqdHosts []string `toml:"nsqd_hosts"`
+	NsqdHosts    []string `toml:"nsqd_hosts"`    // for producer or consumer
+	LookupdHosts []string `toml:"lookupd_hosts"` // for consumer only
 }
 
 // NewProducer will create a producer dynamically according to
 // the value of conf.BusType.
 //
-// BusType supported values:
-// - "stdout" (default if TaskBus is empty)
-// - "file"
-// - "nsq"
+// BusType supported values: (see BusesConfig)
 //
 // For 'nsq' bus:
 // - if no NsqdHosts are provided then it will default to 'localhost:4150'
-func NewProducer(conf *ProducersConfig) (bus.Producer, error) {
+func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 	// setup bus producer
 	var p bus.Producer
 	var err error
@@ -46,7 +63,12 @@ func NewProducer(conf *ProducersConfig) (bus.Producer, error) {
 		p = iobus.NewStdoutProducer()
 		break
 	case "file":
-		p, err = iobus.NewFileProducer(conf.FilePath)
+		writePath := conf.WritePath
+		if writePath == "" {
+			writePath = defaultWritePath
+		}
+
+		p, err = iobus.NewFileProducer(writePath)
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf(
 				"err creating file producer: '%v'\n",
@@ -72,6 +94,59 @@ func NewProducer(conf *ProducersConfig) (bus.Producer, error) {
 	}
 
 	return p, nil
+}
+
+// NewConsumer will create a consumer dynamically according to
+// the value of conf.BusType.
+//
+// BusType supported values (see BusesConfig)
+//
+// For 'nsq' bus:
+// - if no NsqdHosts or LookupdHosts are provided then it
+//   will default to 'localhost:4150'
+func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
+	// setup bus producer
+	var c bus.Consumer
+	var err error
+
+	switch conf.BusType {
+	case "stdin", "":
+		c = iobus.NewStdinConsumer()
+		break
+	case "file":
+		readPath := conf.ReadPath
+		if readPath == "" {
+			readPath = defaultReadPath
+		}
+
+		c, err = iobus.NewFileConsumer(readPath)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf(
+				"err creating file consumer: '%v'\n",
+				err.Error(),
+			))
+		}
+		break
+	case "nsq":
+		nsqConf := &nsqbus.Config{}
+		if len(conf.LookupdHosts) > 0 {
+			nsqConf.LookupdAddrs = conf.LookupdHosts
+		} else if len(conf.NsqdHosts) > 0 {
+			nsqConf.NSQdAddrs = conf.NsqdHosts
+		} else {
+			nsqConf.NSQdAddrs = []string{"localhost:4150"}
+		}
+
+		c, err = nsqbus.NewLazyConsumer(nsqConf)
+		break
+	default:
+		return nil, errors.New(fmt.Sprintf(
+			"task bus '%v' not supported - choices are 'stdin', 'file' or 'nsq'",
+			conf.BusType,
+		))
+	}
+
+	return c, nil
 }
 
 // FmtTask will format a task value from 'template' and 'dateHour'.

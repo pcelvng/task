@@ -17,7 +17,7 @@ func NewBackloader(conf *Config) (*Backloader, error) {
 	}
 
 	// create producer and connect
-	p, err := util.NewProducer(conf.ProducersConfig)
+	p, err := util.NewProducer(conf.BusesConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -13,12 +13,12 @@ import (
 
 func NewConfig() *Config {
 	return &Config{
-		ProducersConfig: &util.ProducersConfig{},
+		BusesConfig: &util.BusesConfig{},
 	}
 }
 
 type Config struct {
-	*util.ProducersConfig
+	*util.BusesConfig
 
 	Start time.Time // start of backload
 	End   time.Time // end of backload
@@ -26,8 +26,10 @@ type Config struct {
 	Topic        string // topic override (uses 'TaskType' if not provided)
 	TaskType     string
 	TaskTemplate string
-	SkipXHours   int
-	OnHours      []int // each value from 0-23
+
+	// TODO: implement SkipXHours and OnHours
+	SkipXHours int
+	OnHours    []int // each value from 0-23
 }
 
 // NsqdHostsString will set Config.NsqdHosts from a comma
