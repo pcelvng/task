@@ -31,7 +31,7 @@ type Consumer struct {
 	scanner    *bufio.Scanner
 }
 
-func (c *Consumer) Connect() error {
+func (c *Consumer) Connect(_, _ string) error {
 	if c.scanner == nil {
 		c.scanner = bufio.NewScanner(c.readCloser)
 	}

@@ -28,7 +28,7 @@ func TestNew(t *testing.T) {
 
 func TestNewFromBytes(t *testing.T) {
 	// setup - not completed task
-	tstring := `{"type":"type.test","task":"test_task","timestamp":"2000-01-01T01:01:00.01Z"}`
+	tstring := `{"type":"type.test","task":"test_task","created":"2000-01-01T01:01:00.01Z"}`
 	tbytes := []byte(tstring)
 
 	ttask, err := NewFromBytes(tbytes)
@@ -48,15 +48,15 @@ func TestNewFromBytes(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'", expectedTask, ttask.Task)
 	}
 
-	// Check Task.Timestamp is populated
-	if ttask.Timestamp == nil || ttask.Timestamp.IsZero() {
-		t.Errorf("task.Timestamp should be populated")
+	// Check Task.Created is populated
+	if ttask.Created == nil || ttask.Created.IsZero() {
+		t.Errorf("task.Created should be populated")
 	}
 
-	// Check Task.Timestamp has correct year
-	expectedTimestampYear := 2000
-	if ttask.Timestamp.Year() != expectedTimestampYear {
-		t.Errorf("expected '%v' but got '%v'", expectedTimestampYear, ttask.Timestamp.Year())
+	// Check Task.Created has correct year
+	expectedCreatedYear := 2000
+	if ttask.Created.Year() != expectedCreatedYear {
+		t.Errorf("expected '%v' but got '%v'", expectedCreatedYear, ttask.Created.Year())
 	}
 
 	// Check Task.Result
@@ -84,7 +84,7 @@ func TestNewFromBytes(t *testing.T) {
 
 func TestNewFromBytesCompleted(t *testing.T) {
 	// setup - wellformed json bytes
-	tstring := `{"type":"type.test","task":"test_task","timestamp":"2000-01-01T01:01:00.01Z","result":"complete","started":"2001-01-01T01:01:01Z","completed":"2002-01-01T01:01:01Z"}`
+	tstring := `{"type":"type.test","task":"test_task","created":"2000-01-01T01:01:00.01Z","result":"complete","started":"2001-01-01T01:01:01Z","completed":"2002-01-01T01:01:01Z"}`
 	tbytes := []byte(tstring)
 
 	ttask, err := NewFromBytes(tbytes)
@@ -104,15 +104,15 @@ func TestNewFromBytesCompleted(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'", expectedTask, ttask.Task)
 	}
 
-	// Check Task.Timestamp is populated
-	if ttask.Timestamp == nil || ttask.Timestamp.IsZero() {
-		t.Errorf("task.Timestamp should be populated")
+	// Check Task.Created is populated
+	if ttask.Created == nil || ttask.Created.IsZero() {
+		t.Errorf("task.Created should be populated")
 	}
 
-	// Check Task.Timestamp has correct year
-	expectedTimestampYear := 2000
-	if ttask.Timestamp.Year() != expectedTimestampYear {
-		t.Errorf("expected '%v' but got '%v'", expectedTimestampYear, ttask.Timestamp.Year())
+	// Check Task.Created has correct year
+	expectedCreatedYear := 2000
+	if ttask.Created.Year() != expectedCreatedYear {
+		t.Errorf("expected '%v' but got '%v'", expectedCreatedYear, ttask.Created.Year())
 	}
 
 	// Check Task.Result
@@ -152,7 +152,7 @@ func TestNewFromBytesCompleted(t *testing.T) {
 
 func TestNewFromBytesErr(t *testing.T) {
 	// setup - wellformed json bytes
-	tstring := `{"type":"type.test","task":"test_task","timestamp":"2000-01-01T01:01:00.01Z","result":"error","msg":"test msg","started":"2001-01-01T01:01:01Z","completed":"2002-01-01T01:01:01Z"}`
+	tstring := `{"type":"type.test","task":"test_task","created":"2000-01-01T01:01:00.01Z","result":"error","msg":"test msg","started":"2001-01-01T01:01:01Z","completed":"2002-01-01T01:01:01Z"}`
 	tbytes := []byte(tstring)
 
 	ttask, err := NewFromBytes(tbytes)
@@ -172,15 +172,15 @@ func TestNewFromBytesErr(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'", expectedTask, ttask.Task)
 	}
 
-	// Check Task.Timestamp is populated
-	if ttask.Timestamp == nil || ttask.Timestamp.IsZero() {
-		t.Errorf("task.Timestamp should be populated")
+	// Check Task.Created is populated
+	if ttask.Created == nil || ttask.Created.IsZero() {
+		t.Errorf("task.Created should be populated")
 	}
 
-	// Check Task.Timestamp has correct year
-	expectedTimestampYear := 2000
-	if ttask.Timestamp.Year() != expectedTimestampYear {
-		t.Errorf("expected '%v' but got '%v'", expectedTimestampYear, ttask.Timestamp.Year())
+	// Check Task.Created has correct year
+	expectedCreatedYear := 2000
+	if ttask.Created.Year() != expectedCreatedYear {
+		t.Errorf("expected '%v' but got '%v'", expectedCreatedYear, ttask.Created.Year())
 	}
 
 	// Check Task.Result
@@ -231,28 +231,28 @@ func TestTask_Valid(t *testing.T) {
 	// just Task.Type is not valid
 	ttask.Type = "testtype"
 	if ttask.Valid("") == nil {
-		t.Errorf("valid task should require at least a type, task and timestamp")
+		t.Errorf("valid task should require at least a type, task and created")
 	}
 
 	// just Task.Task is not valid
 	ttask.Type = ""
 	ttask.Task = "testtask"
 	if ttask.Valid("") == nil {
-		t.Errorf("valid task should require at least a type, task and timestamp")
+		t.Errorf("valid task should require at least a type, task and created")
 	}
 
-	// just Task.Timestamp is not valid
+	// just Task.Created is not valid
 	ttask.Type = ""
 	ttask.Task = ""
-	ttask.Timestamp = &now
+	ttask.Created = &now
 	if ttask.Valid("") == nil {
-		t.Errorf("valid task should require at least a type, task and timestamp")
+		t.Errorf("valid task should require at least a type, task and created")
 	}
 
-	// including type, task and timestamp is valid
+	// including type, task and created is valid
 	ttask.Type = "testtype"
 	ttask.Task = "testtask"
-	ttask.Timestamp = &now
+	ttask.Created = &now
 	if ttask.Valid("") != nil {
 		t.Errorf("task should be valid")
 	}
@@ -360,9 +360,9 @@ func TestTask_Bytes(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'", ttask.Task, newTask.Task)
 	}
 
-	// check Timestamp
-	if newTask.Timestamp != ttask.Timestamp {
-		t.Errorf("expected '%v' but got '%v'", ttask.Timestamp, newTask.Timestamp)
+	// check Created
+	if newTask.Created != ttask.Created {
+		t.Errorf("expected '%v' but got '%v'", ttask.Created, newTask.Created)
 	}
 
 	// check Result
@@ -387,7 +387,7 @@ func TestTask_Bytes(t *testing.T) {
 
 	// check bytes of "omitempty" type members
 	ts, _ := time.Parse(time.RFC3339, "2000-01-01T00:00:00Z")
-	ttask.Timestamp = &ts
+	ttask.Created = &ts
 	ttask.Result = "test_result"
 	ttask.Msg = "test message"
 	ttask.Started = &ts
@@ -400,8 +400,8 @@ func TestTask_Bytes(t *testing.T) {
 	}
 
 	// check byte count
-	// {"type":"test_type","task":"test_task","timestamp":"2000-01-01T00:00:00Z","result":"test_result","msg":"test message","started":"2000-01-01T00:00:00Z","completed":"2000-01-01T00:00:00Z"}
-	expectedByteCount = 186
+	// {"type":"test_type","task":"test_task","created":"2000-01-01T00:00:00Z","result":"test_result","msg":"test message","started":"2000-01-01T00:00:00Z","completed":"2000-01-01T00:00:00Z"}
+	expectedByteCount = 184
 	if len(b) != expectedByteCount {
 		t.Errorf("expected '%v' but got '%v'", expectedByteCount, len(b))
 	}
@@ -423,9 +423,9 @@ func TestTask_Bytes(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'", ttask.Task, newTask.Task)
 	}
 
-	// check Timestamp
-	if !newTask.Timestamp.Equal(*ttask.Timestamp) {
-		t.Errorf("expected '%v' but got '%v'", ttask.Timestamp, newTask.Timestamp)
+	// check Created
+	if !newTask.Created.Equal(*ttask.Created) {
+		t.Errorf("expected '%v' but got '%v'", ttask.Created, newTask.Created)
 	}
 
 	// check Result
@@ -556,7 +556,7 @@ func TestResult_Complete(t *testing.T) {
 	// an additional call to Err() should not change anything
 	sameCompletedAt = ttask.Err("some message")
 
-	// should have the same original completed timestamp
+	// should have the same original completed created
 	if !completedAt.Equal(sameCompletedAt) {
 		t.Errorf("expected '%v' but got '%v'", sameCompletedAt, completedAt)
 	}

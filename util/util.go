@@ -38,6 +38,11 @@ type BusesConfig struct {
 	InBusType  string `toml:"in_bus"`
 	OutBusType string `toml:"out_bus"`
 
+	// generic bus type that can normalize to consumer and producer
+	// same valid type values as InBusType and OutBusType except
+	// 'stdin' 'stdout' is generically 'stdio'
+	BusType string `toml:"bus_type"`
+
 	// for "file" bus type
 	WritePath string `toml:"write_file"` // for file producer
 	ReadPath  string `toml:"read_file"`  // for file consumer
@@ -59,8 +64,15 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 	var p bus.Producer
 	var err error
 
-	switch conf.OutBusType {
-	case "stdout", "":
+	// normalize bus type
+	busType := conf.BusType
+	if conf.OutBusType != "" {
+		// out but type overrides generic bus type
+		busType = conf.OutBusType
+	}
+
+	switch busType {
+	case "stdout", "stdio", "":
 		p = iobus.NewStdoutProducer()
 		break
 	case "file":
@@ -110,8 +122,15 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 	var c bus.Consumer
 	var err error
 
-	switch conf.InBusType {
-	case "stdin", "":
+	// normalize bus type
+	busType := conf.BusType
+	if conf.InBusType != "" {
+		// out but type overrides generic bus type
+		busType = conf.InBusType
+	}
+
+	switch busType {
+	case "stdin", "stdio", "":
 		c = iobus.NewStdinConsumer()
 		break
 	case "file":

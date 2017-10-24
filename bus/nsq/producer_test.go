@@ -27,8 +27,8 @@ func TestNewProducer(t *testing.T) {
 		t.Error("nsq producer should have nsqConf")
 	}
 
-	// test has 3 conns
-	expected := 3
+	// test has 1 conns
+	expected := 1
 	if p.numConns != expected {
 		t.Errorf("expected '%v' numConss but got '%v'", expected, p.numConns)
 	}

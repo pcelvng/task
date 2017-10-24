@@ -65,7 +65,7 @@ func TestPkg(t *testing.T) {
 		t.Error("msg should not be marked done")
 	}
 
-	err = c.Connect()
+	err = c.Connect("", "")
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -183,7 +183,7 @@ func TestParallel(t *testing.T) {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
 
-	err = c.Connect()
+	err = c.Connect("", "")
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}

@@ -198,12 +198,12 @@ func TestSimpleReceiver_Done(t *testing.T) {
 
 	tsk := task.New("testtype", "testtask1")
 	ts := time.Date(2000, 01, 01, 00, 00, 00, 0, time.UTC)
-	tsk.Timestamp = &ts
+	tsk.Created = &ts
 	receiver := &SimpleReceiver{}
 	receiver.Done(tsk)
 
 	logLine := buf.String()
-	// expected output: `{"type":"testtype","task":"testtask1","timestamp":"2000-01-01T00:00:00Z"}`
+	// expected output: `{"type":"testtype","task":"testtask1","created":"2000-01-01T00:00:00Z"}`
 	expectedCnt := 74
 	if len(logLine) != expectedCnt {
 		t.Errorf("expected '%v' but got '%v'", expectedCnt, len(logLine))

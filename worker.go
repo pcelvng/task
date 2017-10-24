@@ -1,12 +1,14 @@
 package task
 
-// Launch will instantiate a worker and
-// return it in a state ready to receive
-// a task.
+// LaunchFunc is called by the Launcher to
+// generate a fresh new worker specifically
+// for that task.
 //
-// Launch is called once per task. Every
+// LaunchFunc is called once per task. Every
 // task gets its own worker. One worker per
-// task and one task per worker.
+// task and one task per worker. Although,
+// the worker implementation can get around this
+// if it really needs/wants to.
 //
 // If there is an error launching the worker
 // (like connection problems) then the worker
@@ -17,7 +19,7 @@ package task
 // *Task is required to create a worker to emphasize
 // that there should generally be one task per
 // worker and one worker per task.
-type Launch func(*Task) Worker
+type LaunchFunc func(*Task) Worker
 
 type Worker interface {
 	// DoTask will actually carry out completing the

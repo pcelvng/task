@@ -54,9 +54,9 @@ type LazyConsumer struct {
 
 // connect will connect nsq. An error is returned if there
 // is a problem connecting.
-func (c *LazyConsumer) Connect() error {
+func (c *LazyConsumer) Connect(topic, channel string) error {
 	// initialize nsq consumer - does not connect
-	consumer, err := gonsq.NewConsumer(c.conf.Topic, c.conf.Channel, c.nsqConf)
+	consumer, err := gonsq.NewConsumer(topic, channel, c.nsqConf)
 	if err != nil {
 		return err
 	}

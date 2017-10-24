@@ -1,4 +1,4 @@
-# out_bus = "" # "" (stdout), "stdout" (default), "file", "nsq"
+bus_type = "" # "" (stdout), "stdout" (default), "file", "nsq"
 
 # "file" task bus options
 # default = "./output-tasks.json"
@@ -30,7 +30,7 @@ task_type = "task-type" # REQUIRED
 #
 # Note: only supports 24 hour (military time) and always reported in
 # UTC. Does not support higher granularity than hour.
-task_template = "{yyyy}-{mm}-{dd}:{hh}" # REQUIRED
+task_template = "{yyyy}/{mm}/{dd}/{hh}" # REQUIRED
 
 # offset in hours from the moment of creation
 # if task runs at "2017-01-04T14:15" and the offset is -1
@@ -38,7 +38,7 @@ task_template = "{yyyy}-{mm}-{dd}:{hh}" # REQUIRED
 # Can accept a positive of negative value.
 #
 # Default is 0 (no offset)
-#hour_offset = -1
+hour_offset = -2
 
 # topic is not required and if not specified will default to
 # the value of "task_type".

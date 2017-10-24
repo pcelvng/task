@@ -66,11 +66,9 @@ func TestNewConsumer(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:   "testtopic",
-		Channel: "testchannel",
-		// Logger:       logger,
-		// NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
+	// Logger:       logger,
+	// NSQdAddrs: []string{"localhost:4150"},
+	// LookupdAddrs: []string{"localhost:4160"},
 	}
 
 	lc, err := NewLazyConsumer(conf)
@@ -87,16 +85,6 @@ func TestNewConsumer(t *testing.T) {
 	// is called)
 	if lc.consumer != nil {
 		t.Errorf("nsq consumer should be nil")
-	}
-
-	// check that conf was set by checking the topic
-	if lc.conf.Topic != conf.Topic {
-		t.Errorf("expected topic '%v' but got '%v'", conf.Topic, lc.conf.Topic)
-	}
-
-	// check that conf was set by checking the topic
-	if lc.conf.Channel != conf.Channel {
-		t.Errorf("expected channel '%v' but got '%v'", conf.Channel, lc.conf.Channel)
 	}
 
 	// check that nsqConf was set and that MaxInFlight == 0
@@ -117,12 +105,12 @@ func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:   "",
-		Channel: "testchannel",
-		// Logger:       logger,
-		// NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
+	// Logger:       logger,
+	// NSQdAddrs: []string{"localhost:4150"},
+	// LookupdAddrs: []string{"localhost:4160"},
 	}
+	topic := ""
+	channel := "testchannel"
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -130,7 +118,7 @@ func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 	}
 
 	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(); err == nil {
+	if err := lc.Connect(topic, channel); err == nil {
 		t.Errorf("expected nsqd error but got nil instead\n")
 	}
 
@@ -150,12 +138,12 @@ func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:   "testtopic",
-		Channel: "",
 		// Logger:       logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
 	}
+	topic := "testtopic"
+	channel := ""
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -163,7 +151,7 @@ func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
 	}
 
 	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(); err == nil {
+	if err := lc.Connect(topic, channel); err == nil {
 		t.Errorf("expected nsqd invalid channel error but got nil instead\n")
 	}
 
@@ -183,12 +171,12 @@ func TestLazyConsumer_Connect(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:   "testtopic",
-		Channel: "testchannel",
 		Logger:  logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
 	}
+	topic := "testtopic"
+	channel := "testchannel"
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -196,7 +184,7 @@ func TestLazyConsumer_Connect(t *testing.T) {
 	}
 
 	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(); err != nil {
+	if err := lc.Connect(topic, channel); err != nil {
 		t.Errorf("err '%v' when connecting to nsqd\n", err.Error())
 	}
 
@@ -217,12 +205,12 @@ func TestLazyConsumer_ConnectNSQdsBad(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:     "testtopic",
-		Channel:   "testchannel",
 		Logger:    logger,
 		NSQdAddrs: []string{"localhost:4000"},
 		// LookupdAddrs: []string{"localhost:4160"},
 	}
+	topic := "testtopic"
+	channel := "testchannel"
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -230,7 +218,7 @@ func TestLazyConsumer_ConnectNSQdsBad(t *testing.T) {
 	}
 
 	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(); err == nil {
+	if err := lc.Connect(topic, channel); err == nil {
 		t.Errorf("expected err but got nil\n")
 	}
 
@@ -251,12 +239,12 @@ func TestLazyConsumer_ConnectNSQds(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:     "testtopic",
-		Channel:   "testchannel",
 		Logger:    logger,
 		NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
 	}
+	topic := "testtopic"
+	channel := "testchannel"
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -264,7 +252,7 @@ func TestLazyConsumer_ConnectNSQds(t *testing.T) {
 	}
 
 	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(); err != nil {
+	if err := lc.Connect(topic, channel); err != nil {
 		t.Errorf("expected nil but got err: '%v'\n", err.Error())
 	}
 
@@ -290,12 +278,12 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:   "testtopic",
-		Channel: "testchannel",
 		Logger:  logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4000"}, // bad port
 	}
+	topic := "testtopic"
+	channel := "testchannel"
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -303,7 +291,7 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 	}
 
 	// connect to local lookupd - should get error
-	if err := lc.Connect(); err != nil {
+	if err := lc.Connect(topic, channel); err != nil {
 		t.Errorf("expected nil but got: '%v'\n", err.Error())
 	}
 
@@ -336,12 +324,12 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:   "testtopic",
-		Channel: "testchannel",
 		Logger:  logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port
 	}
+	topic := "testtopic"
+	channel := "testchannel"
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -349,7 +337,7 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 	}
 
 	// connect to local lookupd - should not get error
-	if err := lc.Connect(); err != nil {
+	if err := lc.Connect(topic, channel); err != nil {
 		t.Errorf("expected nil but got: '%v'\n", err.Error())
 	}
 
@@ -383,20 +371,18 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	// - Should be able to handle multiple concurrent Msg()
 	// calls.
 
-	// load the topic with messages.
-	topic := "testtopic"
-	msgCnt := 1000
-	AddTasks(topic, msgCnt)
-
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Topic:   topic,
-		Channel: "testchannel",
 		Logger:  logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port
 	}
+	topic := "testtopic"
+	channel := "testchannel"
+
+	msgCnt := 1000
+	AddTasks(topic, msgCnt)
 
 	lc, err := NewLazyConsumer(conf)
 	if err != nil {
@@ -404,7 +390,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	}
 
 	// connect to local lookupd - should not get error
-	if err := lc.Connect(); err != nil {
+	if err := lc.Connect(topic, channel); err != nil {
 		t.Errorf("expected nil but got: '%v'\n", err.Error())
 	}
 

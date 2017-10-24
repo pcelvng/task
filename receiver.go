@@ -2,7 +2,7 @@ package task
 
 // A Receiver is responsible for:
 // - Connecting to the task bus
-// - Mainting the task bus connection
+// - Maintaining the task bus connection
 // - Cleanly closing the connection
 // - Reliably retrieving a single task message at a time
 //   When Next is called in such a way that other workers do
@@ -28,9 +28,9 @@ type Receiver interface {
 	// If the receiver lost a connection to the task bus then
 	// it should try to re-connect before returning an error.
 	//
-	// A receiver may communicate a message is the last one
-	// by returning 'last' as true.
-	Next() (tsk *Task, last bool, err error)
+	// A receiver may communicate there are no more messages
+	// by returning 'done' as true.
+	Next() (tsk *Task, done bool, err error)
 
 	// Done will accept a task and send it back to the
 	// task bus.

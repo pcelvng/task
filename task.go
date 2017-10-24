@@ -11,9 +11,9 @@ import (
 func New(ttype, task string) *Task {
 	now := time.Now()
 	return &Task{
-		Type:      ttype,
-		Task:      task,
-		Timestamp: &now,
+		Type:    ttype,
+		Task:    task,
+		Created: &now,
 	}
 }
 
@@ -38,9 +38,9 @@ func NewFromBytes(b []byte) (*Task, error) {
 // directly.
 type Task struct {
 	// Core Task parameters
-	Type      string     `json:"type"` // "audit.fb.api"
-	Task      string     `json:"task"`
-	Timestamp *time.Time `json:"timestamp,omitempty"`
+	Type    string     `json:"type"` // "audit.fb.api"
+	Task    string     `json:"task"`
+	Created *time.Time `json:"created,omitempty"`
 
 	// Task result parameters
 	Result    Result     `json:"result,omitempty"`
@@ -203,8 +203,8 @@ func (t *Task) Valid(taskType string) error {
 		return &InvalidError{msg: errMsg}
 	}
 
-	// Has non-zero Task.Timestamp
-	if t.Timestamp == nil || t.Timestamp.IsZero() {
+	// Has non-zero Task.Created
+	if t.Created == nil || t.Created.IsZero() {
 		errMsg = "task timestamp is a zero value"
 		return &InvalidError{msg: errMsg}
 	}

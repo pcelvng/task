@@ -15,6 +15,11 @@ func NewConfig() *Config {
 type Config struct {
 	*util.BusesConfig
 
+	// topic and channel to listen to
+	// done tasks for retry review.
+	DoneTopic   string
+	DoneChannel string
+
 	// retry rules
 	RetryRules []*RetryRule `toml:"rule"`
 }
@@ -23,7 +28,7 @@ type RetryRule struct {
 	TaskType    string `toml:"task_type"`
 	Retries     int    `toml:"retries"`
 	WaitMinutes int    `toml:"wait_minutes"`
-	Topic       string `toml:"topic"` // topic override
+	Topic       string `toml:"done_topic"` // topic override
 }
 
 func LoadConfig(filePath string) (*Config, error) {

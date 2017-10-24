@@ -1,7 +1,7 @@
 package bus
 
 type Consumer interface {
-	Connect() error
+	Connect(topic, channel string) error
 	Msg() (msg []byte, done bool, err error)
 	Close() error
 }

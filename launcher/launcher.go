@@ -12,10 +12,21 @@ var (
 	defaultTimeout = time.Second * 10
 )
 
+func NewConfig() *Config {
+	return &Config{}
+}
+
+type Config struct {
+	Receiver    task.Receiver
+	LaunchFunc  task.LaunchFunc
+	MaxInFlight int
+	Timeout     time.Duration // timeout when waiting for a task to shutdown cleanly
+}
+
 type Launcher struct {
 	conf         *Config
 	receiver     task.Receiver
-	launch       task.Launch
+	launchFunc   task.LaunchFunc
 	closeTimeout time.Duration
 
 	// wg is the wait group for communicating
@@ -55,14 +66,7 @@ type Launcher struct {
 	last chan int
 }
 
-type Config struct {
-	Receiver    task.Receiver
-	Launch      task.Launch
-	MaxInFlight int
-	Timeout     time.Duration
-}
-
-// New will create a new Launcher instance.
+// New will create a new Launcher
 func New(c *Config) (*Launcher, error) {
 	// make sure MaxInFlight is at least 1
 	maxInFlight := 1
@@ -71,6 +75,10 @@ func New(c *Config) (*Launcher, error) {
 	}
 
 	// use default timeout if none is provided.
+	timeout := defaultTimeout
+	if c.Timeout > 0 {
+		timeout = c.Timeout
+	}
 
 	// create the slots by populating the
 	// buffered channel.
@@ -80,11 +88,12 @@ func New(c *Config) (*Launcher, error) {
 	}
 
 	return &Launcher{
-		conf:        c,
-		receiver:    c.Receiver,
-		launch:      c.Launch,
-		maxInFlight: maxInFlight,
-		slots:       slots,
+		conf:         c,
+		receiver:     c.Receiver,
+		launchFunc:   c.LaunchFunc,
+		maxInFlight:  maxInFlight,
+		slots:        slots,
+		closeTimeout: timeout,
 	}, nil
 }
 
@@ -207,11 +216,11 @@ func (l *Launcher) doLaunch(tsk *task.Task) {
 	l.Add(1)
 	defer l.Done()
 
-	worker := l.launch(tsk)
+	worker := l.launchFunc(tsk)
 	doneTsk := worker.DoTask()
 
 	select {
-	case tsk <- doneTsk:
+	case tsk = <-doneTsk:
 		// send task back to the receiver
 		l.receiver.Done(tsk)
 		return
@@ -224,7 +233,7 @@ func (l *Launcher) doLaunch(tsk *task.Task) {
 		// as the timeout permits.
 		tckr := time.NewTicker(l.closeTimeout)
 		select {
-		case tsk <- doneTsk:
+		case tsk = <-doneTsk:
 			tckr.Stop()
 			l.receiver.Done(tsk)
 			return
@@ -256,5 +265,5 @@ func (l *Launcher) Close() error {
 		return err
 	}
 
-	return
+	return nil
 }
