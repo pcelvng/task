@@ -2,9 +2,8 @@ package main
 
 import (
 	"math/rand"
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/pcelvng/task"
 )
@@ -12,9 +11,11 @@ import (
 const workerType = "noop"
 
 func NewLauncherFunc(c Config) task.LaunchFunc {
-	return *LauncherFunc{
+	lf := LauncherFunc{
 		conf: c,
 	}
+
+	return lf.LaunchFunc
 }
 
 type LauncherFunc struct {
@@ -50,7 +51,7 @@ func (w *NoopWorker) DoTask() chan *task.Task {
 
 func (w *NoopWorker) doTask() {
 	// calc if failure
-	isFail = isFail(w.config.FailRate)
+	isFail := checkFail(w.config.FailRate)
 
 	var dur time.Duration
 	if isFail { // calc failDuration
@@ -108,7 +109,7 @@ func failDuration(dur, durV time.Duration) time.Duration {
 // rate is assumed to be a value between 0-100.
 // A value of 100 or more will always return true and
 // a value of 0 or less will always return false.
-func isFail(rate int) bool {
+func checkFail(rate int) bool {
 	if rate <= 0 {
 		return false
 	}

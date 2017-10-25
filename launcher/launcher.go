@@ -3,7 +3,9 @@ package launcher
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
+	"fmt"
 
 	"github.com/pcelvng/task"
 )
@@ -21,49 +23,6 @@ type Config struct {
 	LaunchFunc  task.LaunchFunc
 	MaxInFlight int
 	Timeout     time.Duration // timeout when waiting for a task to shutdown cleanly
-}
-
-type Launcher struct {
-	conf         *Config
-	receiver     task.Receiver
-	launchFunc   task.LaunchFunc
-	closeTimeout time.Duration
-
-	// wg is the wait group for communicating
-	// when all tasks are complete.
-	sync.WaitGroup
-
-	// quit signals that everything needs
-	// to be shutdown by the launcher.
-	quit chan int
-
-	// complete is the channel used to pass
-	// completed tasks from the workers.
-	complete chan *task.Task
-
-	// doing records that the Do()
-	// method has already been called.
-	doing bool
-
-	// describes the maximum number of tasks
-	// that the launcher will allow at one
-	// time.
-	//
-	// Must have a value greater than zero.
-	maxInFlight int
-
-	// slots describes the number of slots
-	// available. Each slot represents a
-	// worker opening to work on a task -
-	// if a task is available.
-	slots chan int
-
-	// sending on last will signal that the
-	// receiver has sent the last task.
-	// After the last task and any other
-	// in-progress tasks are complete the launcher
-	// will shutdown.
-	last chan int
 }
 
 // New will create a new Launcher
@@ -94,18 +53,82 @@ func New(c *Config) (*Launcher, error) {
 		maxInFlight:  maxInFlight,
 		slots:        slots,
 		closeTimeout: timeout,
+		lastChan:     make(chan interface{}),
+		closedChan:   make(chan interface{}),
+		quitChan:     make(chan interface{}),
 	}, nil
+}
+
+type Launcher struct {
+	conf         *Config
+	receiver     task.Receiver
+	launchFunc   task.LaunchFunc
+	closeTimeout time.Duration
+
+	// wg is the wait group for communicating
+	// when all tasks are complete.
+	sync.WaitGroup
+
+	// quitChan signals that everything needs
+	// to be shutdown by the launcher.
+	quitChan chan interface{}
+
+	// closedChan chan interface{}
+	// closing closedChan indicates that everything
+	// has completed and/or shutdown in the best
+	// way possible.
+	// This is the mechanism that the launcher uses
+	// to communicate to the application that everything
+	// is done so that the application can shut down if
+	// it wants to.
+	closedChan chan interface{}
+	isClosed   int64
+
+	// marks that the Start() method has been called.
+	started int64
+
+	// doing records that the Do()
+	// method has already been called.
+	doing bool
+
+	// describes the maximum number of tasks
+	// that the launcher will allow at one
+	// time.
+	//
+	// Must have a value greater than zero.
+	maxInFlight int
+
+	// slots describes the number of slots
+	// available. Each slot represents a
+	// worker opening to work on a task -
+	// if a task is available.
+	slots chan int
+
+	// last will be set to true when it is processing
+	// the last message. When the last message is
+	// in progress the lastChan will be closed and when
+	// the final task is complete the launcher will
+	// close down.
+	last     int64
+	lastChan chan interface{}
 }
 
 // Start will connect the receiver and start
 // the worker so that it is ready to accept tasks.
-func (l *Launcher) Start() error {
-	// get the receiver ready
-	if err := l.receiver.Connect(); err != nil {
-		return err
+func (l *Launcher) Start() (chan interface{}, error) {
+	// check if already started
+	if !atomic.CompareAndSwapInt64(&l.started, 0, 1) {
+		return l.closedChan, nil
 	}
 
-	return nil
+	closedChan := make(chan interface{})
+	l.closedChan = closedChan
+
+	// get the receiver ready
+	if err := l.receiver.Connect(); err != nil {
+		return l.closedChan, err
+	}
+	return l.closedChan, nil
 }
 
 // Do will get tasks from the receiver
@@ -121,6 +144,7 @@ func (l *Launcher) Do() {
 		return
 	}
 	go l.do()
+
 	l.doing = true
 }
 
@@ -149,19 +173,21 @@ func (l *Launcher) do() {
 	// is a worker slot available to work on it.
 	for {
 		select {
-		case <-l.last:
+		case <-l.quitChan:
+			return
+		case <-l.lastChan:
 			// make sure call l.Wait()
 			// before l.Close() or else
 			// the tasks will be forced
 			// to close without completing.
 			l.Wait()
 			l.Close()
+			return
+
 		// request another task
 		// if there is a slot available
 		case <-l.slots:
 			l.next()
-		case <-l.quit:
-			break
 		}
 	}
 }
@@ -182,7 +208,7 @@ func (l *Launcher) do() {
 // - a new task is allowed (maxInFlight not reached yet)
 // - the last task has not already been received.
 func (l *Launcher) next() {
-	tsk, last, err := l.receiver.Next()
+	tsk, done, err := l.receiver.Next()
 
 	// An error from next means that
 	// Next was called when the queue
@@ -192,21 +218,37 @@ func (l *Launcher) next() {
 	// Log the message and send the 'last'
 	// signal.
 	if err != nil {
-		log.Print(err.Error())
+		log.Println(err.Error())
 
-		l.last <- 1
+		// close up shop if all done.
+		if done {
+			if atomic.CompareAndSwapInt64(&l.last, 0, 1) {
+				close(l.lastChan)
+			}
+		}
 
 		// an error means there is no task so just return.
+		l.giveBackSlot()
 		return
 	}
 
 	// do task
-	go l.doLaunch(tsk)
-
-	// record if the last task is reached.
-	if last {
-		l.last <- 1
+	if tsk != nil {
+		go l.doLaunch(tsk)
 	}
+
+	// close up shop if all done.
+	if done {
+		if atomic.CompareAndSwapInt64(&l.last, 0, 1) {
+			close(l.lastChan)
+		}
+	}
+}
+
+// giveSlot will attempt to give back a slot.
+// needs to be used with care to prevent locks.
+func (l *Launcher) giveBackSlot() {
+	l.slots <- 1
 }
 
 // doLaunch will safely handle the wait
@@ -223,9 +265,14 @@ func (l *Launcher) doLaunch(tsk *task.Task) {
 	case tsk = <-doneTsk:
 		// send task back to the receiver
 		l.receiver.Done(tsk)
+
+		// give back the slot so that the next task
+		// can be launched.
+		l.giveBackSlot()
+
 		return
-	case <-l.quit:
-		// force the worker close
+	case <-l.quitChan:
+		// force the worker closed
 		worker.Close()
 
 		// wait for the task to close out
@@ -240,7 +287,7 @@ func (l *Launcher) doLaunch(tsk *task.Task) {
 		case <-tckr.C:
 			// only case where the
 			// launcher will manage task state
-			msg := "worker close timeout"
+			msg := fmt.Sprintf("worker closed from timeout; waited '%v'", l.closeTimeout.String())
 			tsk.Err(msg)
 			l.receiver.Done(tsk)
 			return
@@ -250,15 +297,29 @@ func (l *Launcher) doLaunch(tsk *task.Task) {
 
 // Close will close the receiver
 // and outstanding workers and shutdown the do loop.
+// Close is safe to call more than once and safe
+// to call before Start but won't do anything in both
+// cases.
 func (l *Launcher) Close() error {
+	// check that Start was called
+	if atomic.LoadInt64(&l.started) != int64(1) {
+		return nil
+	}
+
+	// check that Close hasn't already been called
+	if !atomic.CompareAndSwapInt64(&l.isClosed, 0, 1) {
+		return nil // already called
+	}
+
 	// close the task loop and shutdown
 	// all workers. Give all the workers
 	// a chance to close cleanly up until
 	// the timeout is reached.
-	close(l.quit)
+	close(l.quitChan)
 	l.Wait()
+	defer close(l.closedChan)
 
-	// finally close the receiver
+	// finally, close the receiver
 	// all task responses should have already
 	// processed.
 	if err := l.receiver.Close(); err != nil {

@@ -18,7 +18,9 @@ type Launcher interface {
 	Do()
 
 	// Start necessary connections.
-	Start() error
+	// the returned channel will be closed if the
+	// launcher decides to shutdown.
+	Start() (chan interface{}, error)
 
 	// Close connections and safely shutdown workers
 	// giving the workers time to cleanup in-progress

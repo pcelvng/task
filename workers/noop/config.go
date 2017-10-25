@@ -16,9 +16,10 @@ func NewConfig() *Config {
 type Config struct {
 	*util.BusesConfig
 
-	Topic       string // topic override (uses 'TaskType' if not provided)
+	TaskType    string // will be used as the default topic and channel
+	TaskTopic   string // topic override (uses 'TaskType' if not provided)
+	TaskChannel string // channel to listen for tasks of type TaskType
 	DoneTopic   string // topic to return a done task
-	TaskType    string
 	FailRate    int
 	Dur         time.Duration // how long the task will take to finish successfully
 	DurVariance time.Duration // random adjustment to the Dur value

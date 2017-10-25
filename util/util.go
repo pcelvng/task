@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -67,13 +68,15 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 	// normalize bus type
 	busType := conf.BusType
 	if conf.OutBusType != "" {
-		// out but type overrides generic bus type
+		// out bus type overrides generic bus type
 		busType = conf.OutBusType
 	}
 
 	switch busType {
 	case "stdout", "stdio", "":
 		p = iobus.NewStdoutProducer()
+		log.Println("created stdout producer")
+
 		break
 	case "file":
 		writePath := conf.WritePath
@@ -88,6 +91,8 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 				err.Error(),
 			))
 		}
+		log.Printf("created file producer at '%v'\n", writePath)
+
 		break
 	case "nsq":
 		nsqConf := &nsqbus.Config{}
@@ -96,8 +101,10 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 		} else {
 			nsqConf.NSQdAddrs = conf.NsqdHosts
 		}
-
 		p = nsqbus.NewProducer(nsqConf)
+
+		log.Printf("created nsq producer at '%v'\n", nsqConf.NSQdAddrs)
+
 		break
 	default:
 		return nil, errors.New(fmt.Sprintf(
@@ -132,6 +139,8 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 	switch busType {
 	case "stdin", "stdio", "":
 		c = iobus.NewStdinConsumer()
+		log.Println("created stdin consumer")
+
 		break
 	case "file":
 		readPath := conf.ReadPath
@@ -146,6 +155,8 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 				err.Error(),
 			))
 		}
+		log.Printf("created file consumer at '%v'\n", readPath)
+
 		break
 	case "nsq":
 		nsqConf := &nsqbus.Config{}
@@ -158,6 +169,8 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 		}
 
 		c, err = nsqbus.NewLazyConsumer(nsqConf)
+		log.Printf("created nsq consumer at '%v%v'\n", nsqConf.NSQdAddrs, nsqConf.LookupdAddrs)
+
 		break
 	default:
 		return nil, errors.New(fmt.Sprintf(

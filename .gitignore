@@ -20,9 +20,11 @@ taskmasters/cron/cron
 taskmasters/http/http
 taskmasters/responder/responder
 taskmasters/retry/retry
+workers/noop/noop
 
 # development and usage debris
 bus/nsq/*.dat
 taskmasters/cron/*.json
 taskmasters/retry/*.json
 taskmasters/backloader/*.json
+workers/noop/*.json
