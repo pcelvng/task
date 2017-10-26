@@ -31,7 +31,6 @@ func NewFlexReceiver(conf *util.BusesConfig, inTopic, inChannel, doneTopic strin
 	}
 
 	return fr, nil
-
 }
 
 // FlexReceiver can flexibly receive tasks from

@@ -6,8 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/pcelvng/task/util"
 )
 
 var config = flag.String("config", "", "relative or absolute file path")
@@ -25,22 +23,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	// make consumer
-	c, err := util.NewConsumer(conf.BusesConfig)
-	if err != nil {
-		log.Println(err.Error())
-		os.Exit(1)
-	}
-
-	// make producer
-	p, err := util.NewProducer(conf.BusesConfig)
-	if err != nil {
-		log.Println(err.Error())
-		os.Exit(1)
-	}
-
 	// make retryer
-	rtryr := NewRetryer(c, p, conf.RetryRules)
+	rtryr, err := NewRetryer(conf)
+	if err != nil {
+		log.Println(err.Error())
+		os.Exit(1)
+	}
+
 	err = rtryr.Start()
 	if err != nil {
 		log.Println(err.Error())

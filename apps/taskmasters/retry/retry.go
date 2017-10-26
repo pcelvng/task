@@ -1,26 +1,42 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/pcelvng/task"
 	"github.com/pcelvng/task/bus"
+	"github.com/pcelvng/task/util"
 )
 
-func NewRetryer(consumer bus.Consumer, producer bus.Producer, rules []*RetryRule) *Retryer {
+func NewRetryer(conf *Config) (*Retryer, error) {
+	// make consumer
+	c, err := util.NewConsumer(conf.BusesConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// make producer
+	p, err := util.NewProducer(conf.BusesConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Retryer{
-		consumer:   consumer,
-		producer:   producer,
-		rules:      rules,
+		conf:       conf,
+		consumer:   c,
+		producer:   p,
+		rules:      conf.RetryRules,
 		closeChan:  make(chan interface{}),
 		retryCache: make(map[string]int),
 		rulesMap:   make(map[string]*RetryRule),
-	}
+	}, nil
 }
 
 type Retryer struct {
+	conf       *Config
 	consumer   bus.Consumer
 	producer   bus.Producer
 	rules      []*RetryRule
@@ -36,9 +52,16 @@ type Retryer struct {
 // - connect the producer
 // - begin listening for error tasks
 func (r *Retryer) Start() error {
+	if r.consumer == nil {
+		return errors.New("unable to start - no consumer")
+	}
+
+	if r.producer == nil {
+		return errors.New("unable to start - no producer")
+	}
 
 	// start consumer
-	if err := r.consumer.Connect(); err != nil {
+	if err := r.consumer.Connect(r.conf.DoneTopic, r.conf.DoneChannel); err != nil {
 		return err
 	}
 
@@ -146,10 +169,7 @@ func (r *Retryer) applyRule(tsk *task.Task) {
 // doRetry will wait (if requested by the rule)
 // and then send the task to the outgoing channel
 func (r *Retryer) doRetry(tsk *task.Task, rule *RetryRule) {
-	tckr := time.NewTicker(time.Minute * time.Duration(rule.WaitMinutes))
-
-	// wait for the time to pass
-	<-tckr.C
+	time.Sleep(time.Minute * rule.Wait.Duration)
 
 	// create a new task just like the old one
 	// and send it out.

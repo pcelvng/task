@@ -14,39 +14,30 @@ import (
 )
 
 var (
-	defaultWritePath = "./out_tasks.json"
-	defaultReadPath  = "./in_tasks.json"
+	defaultWritePath = "./out.tsks.json"
+	defaultReadPath  = "./in.tsks.json"
 )
 
 // BusesConfig is a general config struct that
 // provides all potential config values for all
-// bus consumers.
+// bus types.
 //
 // It can be used to easily and dynamically create
-// a producer or consumer.
+// a producer and/or consumer.
 type BusesConfig struct {
-	// Valid producer values:
-	// - "" (stdout)
-	// - "stdout"
+	// Possible Values:
+	// - "stdio" (generic stdin, stdout)
+	// - "stdin" (for consumer)
+	// - "stdout" (for producer)
 	// - "file"
 	// - "nsq"
-	//
-	// Valid consumer values:
-	// - "" (stdin)
-	// - "stdin"
-	// - "file"
-	// - "nsq"
-	InBusType  string `toml:"in_bus"`
-	OutBusType string `toml:"out_bus"`
-
-	// generic bus type that can normalize to consumer and producer
-	// same valid type values as InBusType and OutBusType except
-	// 'stdin' 'stdout' is generically 'stdio'
-	BusType string `toml:"bus_type"`
+	Bus    string `toml:"bus"`
+	InBus  string `toml:"in_bus"`
+	OutBus string `toml:"out_bus"`
 
 	// for "file" bus type
-	WritePath string `toml:"write_file"` // for file producer
-	ReadPath  string `toml:"read_file"`  // for file consumer
+	InFile  string `toml:"in_file"`  // for file producer
+	OutFile string `toml:"out_file"` // for file consumer
 
 	// for "nsq" bus type
 	NsqdHosts    []string `toml:"nsqd_hosts"`    // for producer or consumer
@@ -66,10 +57,10 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 	var err error
 
 	// normalize bus type
-	busType := conf.BusType
-	if conf.OutBusType != "" {
+	busType := conf.Bus
+	if conf.OutBus != "" {
 		// out bus type overrides generic bus type
-		busType = conf.OutBusType
+		busType = conf.OutBus
 	}
 
 	switch busType {
@@ -79,7 +70,7 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 
 		break
 	case "file":
-		writePath := conf.WritePath
+		writePath := conf.OutFile
 		if writePath == "" {
 			writePath = defaultWritePath
 		}
@@ -109,7 +100,7 @@ func NewProducer(conf *BusesConfig) (bus.Producer, error) {
 	default:
 		return nil, errors.New(fmt.Sprintf(
 			"task bus '%v' not supported - choices are 'stdout', 'file' or 'nsq'",
-			conf.OutBusType,
+			conf.OutBus,
 		))
 	}
 
@@ -130,10 +121,10 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 	var err error
 
 	// normalize bus type
-	busType := conf.BusType
-	if conf.InBusType != "" {
+	busType := conf.Bus
+	if conf.InBus != "" {
 		// out but type overrides generic bus type
-		busType = conf.InBusType
+		busType = conf.InBus
 	}
 
 	switch busType {
@@ -143,7 +134,7 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 
 		break
 	case "file":
-		readPath := conf.ReadPath
+		readPath := conf.InFile
 		if readPath == "" {
 			readPath = defaultReadPath
 		}
@@ -175,7 +166,7 @@ func NewConsumer(conf *BusesConfig) (bus.Consumer, error) {
 	default:
 		return nil, errors.New(fmt.Sprintf(
 			"task bus '%v' not supported - choices are 'stdin', 'file' or 'nsq'",
-			conf.InBusType,
+			conf.InBus,
 		))
 	}
 

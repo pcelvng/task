@@ -3,6 +3,8 @@ package main
 import (
 	"github.com/BurntSushi/toml"
 
+	"time"
+
 	"github.com/pcelvng/task/util"
 )
 
@@ -17,18 +19,29 @@ type Config struct {
 
 	// topic and channel to listen to
 	// done tasks for retry review.
-	DoneTopic   string
-	DoneChannel string
+	DoneTopic   string `toml:"done_topic"`
+	DoneChannel string `toml:"done_channel"`
 
 	// retry rules
 	RetryRules []*RetryRule `toml:"rule"`
 }
 
 type RetryRule struct {
-	TaskType    string `toml:"task_type"`
-	Retries     int    `toml:"retries"`
-	WaitMinutes int    `toml:"wait_minutes"`
-	Topic       string `toml:"done_topic"` // topic override
+	TaskType string   `toml:"task_type"`
+	Retries  int      `toml:"retries"`
+	Wait     duration `toml:"wait"`
+	Topic    string   `toml:"topic"` // topic override
+}
+
+type duration struct {
+	time.Duration
+}
+
+func (d *duration) UnmarshalText(text []byte) error {
+	var err error
+
+	d.Duration, err = time.ParseDuration(string(text))
+	return err
 }
 
 func LoadConfig(filePath string) (*Config, error) {

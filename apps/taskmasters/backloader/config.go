@@ -8,7 +8,25 @@ import (
 	"strings"
 	"time"
 
+	"flag"
+
 	"github.com/pcelvng/task/util"
+)
+
+var (
+	taskType   = flag.String("type", "", "REQUIRED; the task type")
+	t          = flag.String("t", "", "alias of 'type'")
+	at         = flag.String("at", "", "alias of 'from' flag")
+	from       = flag.String("from", "", "REQUIRED; format 'yyyy-mm-ddThh' (example: '2017-01-03T01')")
+	to         = flag.String("to", "", "same format as 'from'; if not specified, will run the one hour specified by from")
+	taskBus    = flag.String("bus", "stdout", "one of 'stdout', 'file', 'nsq'")
+	b          = flag.String("b", "", "alias of 'bus'")
+	outFile    = flag.String("out-file", "./out.tasks.json", "file bus path and name when 'file' task-bus specified")
+	nsqdHosts  = flag.String("nsqd-hosts", "localhost:4150", "comma-separated list of nsqd hosts with port")
+	template   = flag.String("template", "{yyyy}-{mm}-{dd}T{hh}:00", "task template")
+	topic      = flag.String("topic", "", "overrides task type as the default topic")
+	skipXHours = flag.Uint("skip-x-hours", 0, "will generate tasks skipping x hours")
+	onHours    = flag.String("on-hours", "", "comma separated list of hours to indicate which hours of a day to backload during a 24 period (each value must be between 0-23). Example '0,4,15' - will only generate tasks on hours 0, 4 and 15")
 )
 
 func NewConfig() *Config {
@@ -66,7 +84,7 @@ func (c *Config) OnHoursString(onHours string) error {
 	return nil
 }
 
-func (c *Config) StartEndStrings(start, end string) error {
+func (c *Config) DateRangeStrings(start, end string) error {
 	dFmt := "2006-01-02T15"
 	// parse start
 	s, err := time.Parse(dFmt, start)
@@ -99,12 +117,12 @@ func (c *Config) StartEndStrings(start, end string) error {
 func (c *Config) Validate() error {
 	// Start required
 	if c.Start.IsZero() {
-		return errors.New("'start' date required")
+		return errors.New("'from' date required")
 	}
 
 	// End required
 	if c.End.IsZero() {
-		return errors.New("'end' date required")
+		return errors.New("'to' date required")
 	}
 
 	// Start before End
@@ -136,4 +154,42 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func LoadConfig() (*Config, error) {
+	flag.Parse()
+
+	// load config
+	c := NewConfig()
+	c.TaskType = *taskType
+	c.TaskTemplate = *template
+	c.SkipXHours = int(*skipXHours)
+	c.Topic = *topic
+	c.OutBus = *taskBus
+	c.OutFile = *outFile
+	c.NsqdHostsString(*nsqdHosts)
+	if err := c.OnHoursString(*onHours); err != nil {
+		return nil, err
+	}
+
+	// alias overrides
+	if *t != "" {
+		c.TaskType = *t
+	}
+
+	if *b != "" {
+		c.Bus = *b
+	}
+
+	from := *from
+	to := *to
+	if *at != "" {
+		from = *at
+		to = *at
+	}
+	if err := c.DateRangeStrings(from, to); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
