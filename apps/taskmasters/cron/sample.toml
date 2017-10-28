@@ -1,0 +1,36 @@
+bus = "" # "" (stdout), "stdout" (default), "file", "nsq"
+#out_file = "./out.tsks.json" # file bus
+#nsqd_hosts = ["localhost:4150"] # nsq bus; tcp port
+
+[[rule]]
+type = "task-type" # REQUIRED # acts as default topic
+cron = "* * * * *" # REQUIRED # s m h mday m wday (https://godoc.org/github.com/robfig/cron)
+template = "{yyyy}/{mm}/{dd}/{hh}" # REQUIRED '{}' values are datetime template values
+offset = -2 # hour offset
+topic = "task-topic" # override task type as the topic
+
+# SAMPLE RULE SET
+#
+# [[rule]]
+# type = "task-type-1"
+# cron = "05 01 * * * *"
+# template = "{yyyy}-{mm}-{dd}:{hh}"
+# offset = -2 # template populated with 'now' - 2 hour values
+# topic = "topic-override-1"
+
+# [[rule]]
+# type = "task-type-2"
+# cron = "05 * * * * *"
+# template = "{yyyy}-{mm}-{dd}:{hh}"
+# offset = 0 # template populated with 'now' values
+
+# [[rule]]
+# cron = "10 05 * * * *"
+# type = "task-type-3"
+# template = "prefix:{yyyy}/{mm}/{dd}/{hh}"
+# offset = 1 # template populated with 'now' + 1 hour values
+
+# [[rule]]
+# cron = "* * * * * *"
+# type = "task-type-4"
+# template = "prefix:{yyyy}/{mm}/{dd}/{hh}"

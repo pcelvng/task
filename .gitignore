@@ -12,3 +12,19 @@
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
+.idea/
+
+# binaries
+apps/taskmasters/backloader/backloader
+apps/taskmasters/cron/cron
+apps/taskmasters/http/http
+apps/taskmasters/responder/responder
+apps/taskmasters/retry/retry
+apps/workers/noop/noop
+
+# development and usage debris
+bus/nsq/*.dat
+apps/taskmasters/cron/*.json
+apps/taskmasters/retry/*.json
+apps/taskmasters/backloader/*.json
+apps/workers/noop/*.json
