@@ -18,6 +18,12 @@ var (
 	defaultReadPath  = "./in.tsks.json"
 )
 
+func NewBusesConfig(bus string) *BusesConfig {
+	return &BusesConfig{
+		Bus: bus, // optional bus type
+	}
+}
+
 // BusesConfig is a general config struct that
 // provides all potential config values for all
 // bus types.

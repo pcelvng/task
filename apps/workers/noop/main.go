@@ -29,10 +29,8 @@ func main() {
 
 	// create launcher
 	lConfig := launcher.NewConfig()
-	lConfig.LaunchFunc = lFn
-	lConfig.Receiver = rcvr
 	lConfig.MaxInFlight = *workers
-	l, err := launcher.New(lConfig)
+	l, err := launcher.New(rcvr, lFn, lConfig)
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)

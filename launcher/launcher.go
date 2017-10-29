@@ -1,11 +1,11 @@
 package launcher
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
-	"fmt"
 
 	"github.com/pcelvng/task"
 )
@@ -15,28 +15,44 @@ var (
 )
 
 func NewConfig() *Config {
-	return &Config{}
+	return &Config{
+		MaxInFlight: 1,
+		Timeout:     defaultTimeout,
+	}
 }
 
 type Config struct {
-	Receiver    task.Receiver
-	LaunchFunc  task.LaunchFunc
+	// MaxInFlight represents the maximum number of workers
+	// that the launcher will allow to run at one time.
+	// It is generally recommended to allow only worker to run
+	// at a time.
 	MaxInFlight int
-	Timeout     time.Duration // timeout when waiting for a task to shutdown cleanly
+
+	// Timeout represents how long the launcher will wait for
+	// a task to shutdown cleanly when closing an in-progress
+	// task.
+	Timeout time.Duration
 }
 
 // New will create a new Launcher
-func New(c *Config) (*Launcher, error) {
-	// make sure MaxInFlight is at least 1
-	maxInFlight := 1
-	if c.MaxInFlight > 1 {
-		maxInFlight = c.MaxInFlight
+func New(rcvr task.Receiver, lnchFn task.LaunchFunc, config *Config) (*Launcher, error) {
+
+	// launch config is optional - create one here if not
+	// provided.
+	if config == nil {
+		config = NewConfig()
 	}
 
-	// use default timeout if none is provided.
+	// make sure MaxInFlight is at least 1
+	maxInFlight := 1
+	if config.MaxInFlight > 1 {
+		maxInFlight = config.MaxInFlight
+	}
+
+	// use default timeout if none provided.
 	timeout := defaultTimeout
-	if c.Timeout > 0 {
-		timeout = c.Timeout
+	if config.Timeout > 0 {
+		timeout = config.Timeout
 	}
 
 	// create the slots by populating the
@@ -47,9 +63,9 @@ func New(c *Config) (*Launcher, error) {
 	}
 
 	return &Launcher{
-		conf:         c,
-		receiver:     c.Receiver,
-		launchFunc:   c.LaunchFunc,
+		conf:         config,
+		receiver:     rcvr,
+		launchFunc:   lnchFn,
 		maxInFlight:  maxInFlight,
 		slots:        slots,
 		closeTimeout: timeout,
