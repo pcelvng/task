@@ -8,8 +8,6 @@ import (
 	"github.com/pcelvng/task"
 )
 
-const workerType = "noop"
-
 func NewLauncherFunc(c Config) task.LaunchFunc {
 	lf := LauncherFunc{
 		conf: c,
@@ -125,8 +123,4 @@ func checkFail(rate int) bool {
 
 func (w *NoopWorker) Close() error {
 	return nil
-}
-
-func (w *NoopWorker) WorkerType() string {
-	return workerType
 }

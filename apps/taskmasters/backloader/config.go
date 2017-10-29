@@ -2,13 +2,12 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
 	"time"
-
-	"flag"
 
 	"github.com/pcelvng/task/util"
 )
@@ -17,7 +16,7 @@ var (
 	taskType   = flag.String("type", "", "REQUIRED; the task type")
 	t          = flag.String("t", "", "alias of 'type'")
 	at         = flag.String("at", "", "alias of 'from' flag")
-	from       = flag.String("from", "", "REQUIRED; format 'yyyy-mm-ddThh' (example: '2017-01-03T01')")
+	from       = flag.String("from", "now", "format 'yyyy-mm-ddThh' (example: '2017-01-03T01'). Allows a special keyword 'now'.")
 	to         = flag.String("to", "", "same format as 'from'; if not specified, will run the one hour specified by from")
 	taskBus    = flag.String("bus", "stdout", "one of 'stdout', 'file', 'nsq'")
 	b          = flag.String("b", "", "alias of 'bus'")
@@ -27,6 +26,8 @@ var (
 	topic      = flag.String("topic", "", "overrides task type as the default topic")
 	skipXHours = flag.Uint("skip-x-hours", 0, "will generate tasks skipping x hours")
 	onHours    = flag.String("on-hours", "", "comma separated list of hours to indicate which hours of a day to backload during a 24 period (each value must be between 0-23). Example '0,4,15' - will only generate tasks on hours 0, 4 and 15")
+
+	dFmt = "2006-01-02T15"
 )
 
 func NewConfig() *Config {
@@ -85,7 +86,6 @@ func (c *Config) OnHoursString(onHours string) error {
 }
 
 func (c *Config) DateRangeStrings(start, end string) error {
-	dFmt := "2006-01-02T15"
 	// parse start
 	s, err := time.Parse(dFmt, start)
 	if err != nil {
@@ -126,6 +126,7 @@ func (c *Config) Validate() error {
 	}
 
 	// Start before End
+	// TODO: make this not a requirement but use the start-end order to determine task creation order.
 	diff := int(c.End.Sub(c.Start))
 	if diff < 0 {
 		return errors.New("'start' must occur before 'end' date")
@@ -187,6 +188,16 @@ func LoadConfig() (*Config, error) {
 		from = *at
 		to = *at
 	}
+
+	now := time.Now().Format(dFmt) // 2017-01-03T01
+	if from == "now" {
+		from = now
+	}
+
+	if to == "now" {
+		to = now
+	}
+
 	if err := c.DateRangeStrings(from, to); err != nil {
 		return nil, err
 	}

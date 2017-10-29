@@ -21,6 +21,7 @@ apps/taskmasters/http/http
 apps/taskmasters/responder/responder
 apps/taskmasters/retry/retry
 apps/workers/noop/noop
+apps/workers/hello-world/hello-world
 
 # development and usage debris
 bus/nsq/*.dat

@@ -38,7 +38,7 @@ func NewFromBytes(b []byte) (*Task, error) {
 // directly.
 type Task struct {
 	// Core Task parameters
-	Type    string     `json:"type"` // "audit.fb.api"
+	Type    string     `json:"type"` // task type
 	Task    string     `json:"task"`
 	Created *time.Time `json:"created,omitempty"`
 

@@ -73,9 +73,4 @@ type Worker interface {
 	// Close is always called after a task is
 	// completed.
 	Close() error
-
-	// WorkerType provides the worker self
-	// identifier that identifies what kind
-	// of task it knows how to complete.
-	WorkerType() string
 }
