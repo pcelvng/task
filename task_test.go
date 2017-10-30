@@ -9,17 +9,15 @@ func TestNew(t *testing.T) {
 	// setup
 	tskType := "test-type"
 	tskInfo := "test-info"
-
-	// func call
 	tsk := New(tskType, tskInfo)
 
-	// test that Task.Type is set correctly
+	// correct type
 	expectedType := tskType
 	if tsk.Type != expectedType {
 		t.Errorf("expected '%v' but got '%v'", expectedType, tsk.Type)
 	}
 
-	// test that Task.Task is set correctly
+	// correct info
 	expectedInfo := tskInfo
 	if tsk.Info != expectedInfo {
 		t.Errorf("expected '%v' but got '%v'", expectedInfo, tsk.Info)
