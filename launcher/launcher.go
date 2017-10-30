@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"context"
 
 	"github.com/pcelvng/task"
 )
@@ -35,7 +36,7 @@ type Config struct {
 }
 
 // New will create a new Launcher
-func New(rcvr task.Receiver, lnchFn task.LaunchFunc, config *Config) (*Launcher, error) {
+func New(rcvr task.Receiver, lnchFn task.LaunchFunc, ctx *context.Context, config *Config) (*Launcher, error) {
 
 	// launch config is optional - create one here if not
 	// provided.
@@ -66,6 +67,7 @@ func New(rcvr task.Receiver, lnchFn task.LaunchFunc, config *Config) (*Launcher,
 		conf:         config,
 		receiver:     rcvr,
 		launchFunc:   lnchFn,
+		ctx:          ctx,
 		maxInFlight:  maxInFlight,
 		slots:        slots,
 		closeTimeout: timeout,
@@ -79,6 +81,7 @@ type Launcher struct {
 	conf         *Config
 	receiver     task.Receiver
 	launchFunc   task.LaunchFunc
+	ctx          *context.Context
 	closeTimeout time.Duration
 
 	// wg is the wait group for communicating

@@ -5,18 +5,17 @@ import (
 
 	"github.com/pcelvng/task"
 	"github.com/pcelvng/task/bus"
-	"github.com/pcelvng/task/util"
 )
 
-func NewFlexReceiver(conf *util.BusesConfig, inTopic, inChannel, doneTopic string) (*FlexReceiver, error) {
+func NewFlexReceiver(conf *bus.BusesConfig, inTopic, inChannel, doneTopic string) (*FlexReceiver, error) {
 	// make consumer
-	c, err := util.NewConsumer(conf)
+	c, err := bus.NewConsumer(conf)
 	if err != nil {
 		return nil, err
 	}
 
 	// make producer
-	p, err := util.NewProducer(conf)
+	p, err := bus.NewProducer(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +38,7 @@ func NewFlexReceiver(conf *util.BusesConfig, inTopic, inChannel, doneTopic strin
 // For example, it could be configured to receive tasks from
 // stdin and write tasks to nsq.
 type FlexReceiver struct {
-	conf      *util.BusesConfig
+	conf      *bus.BusesConfig
 	consumer  bus.Consumer
 	producer  bus.Producer
 	inTopic   string
