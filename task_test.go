@@ -26,7 +26,7 @@ func TestNew(t *testing.T) {
 
 func TestNewFromBytes(t *testing.T) {
 	// setup - not completed task
-	tskStr := `{"type":"test-type","info":"test-info","created":"2000-01-01T01:01:00.01Z"}`
+	tskStr := `{"type":"test-type","info":"test-info","created":"2000-01-01T01:01:00Z"}`
 	tsk, err := NewFromBytes([]byte(tskStr))
 	if err != nil {
 		t.Fatalf("malformed json: '%v'", err.Error())
@@ -45,14 +45,14 @@ func TestNewFromBytes(t *testing.T) {
 	}
 
 	// created date populated
-	if tsk.CreatedAt == nil {
-		t.Error("created date should be populated")
+	if tsk.created.IsZero() {
+		t.Error("created date should not be zero")
 	}
 
 	// created date correct year
 	expectedYear := 2000
-	if tsk.CreatedAt.Year() != expectedYear {
-		t.Errorf("expected '%v' but got '%v'", expectedYear, tsk.CreatedAt.Year())
+	if tsk.created.Year() != expectedYear {
+		t.Errorf("expected '%v' but got '%v'", expectedYear, tsk.created.Year())
 	}
 
 	// result not populated
@@ -68,19 +68,19 @@ func TestNewFromBytes(t *testing.T) {
 	}
 
 	// started date not populated
-	if tsk.StartedAt != nil {
-		t.Error("started date should be nil")
+	if !tsk.started.IsZero() {
+		t.Error("started date should be zero")
 	}
 
-	// done date not populated
-	if tsk.DoneAt != nil {
-		t.Error("date date should be nil")
+	// ended date not populated
+	if !tsk.ended.IsZero() {
+		t.Error("ended date should be zero")
 	}
 }
 
 func TestNewFromBytesCompleted(t *testing.T) {
 	// setup - well-formed json bytes
-	tskStr := `{"type":"test-type","info":"test-info","created":"2000-01-01T01:01:00.01Z","result":"complete","msg":"test msg","started":"2001-01-01T01:01:01Z","done":"2002-01-01T01:01:01Z"}`
+	tskStr := `{"type":"test-type","info":"test-info","created":"2000-01-01T01:01:00Z","result":"complete","msg":"test msg","started":"2001-01-01T01:01:01Z","ended":"2002-01-01T01:01:01Z"}`
 	tsk, err := NewFromBytes([]byte(tskStr))
 	if err != nil {
 		t.Fatalf("malformed json: '%v'\n", err.Error())
@@ -99,14 +99,14 @@ func TestNewFromBytesCompleted(t *testing.T) {
 	}
 
 	// created date is populated
-	if tsk.CreatedAt == nil {
+	if tsk.created.IsZero() {
 		t.Error("created date should be populated")
 	}
 
 	// created date correct year
 	expectedYear := 2000
-	if tsk.CreatedAt.Year() != expectedYear {
-		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.CreatedAt.Year())
+	if tsk.created.Year() != expectedYear {
+		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.created.Year())
 	}
 
 	// correct result
@@ -122,31 +122,31 @@ func TestNewFromBytesCompleted(t *testing.T) {
 	}
 
 	// started date is populated
-	if tsk.StartedAt == nil {
+	if tsk.started.IsZero() {
 		t.Error("started date should be populated")
 	}
 
 	// started date correct year
 	expectedYear = 2001
-	if tsk.StartedAt.Year() != expectedYear {
-		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.StartedAt.Year())
+	if tsk.started.Year() != expectedYear {
+		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.started.Year())
 	}
 
-	// done date is populated
-	if tsk.DoneAt == nil {
-		t.Error("done date should be populated")
+	// ended date is populated
+	if tsk.ended.IsZero() {
+		t.Error("ended date should be populated")
 	}
 
-	// done date correct year
+	// ended date correct year
 	expectedYear = 2002
-	if tsk.DoneAt.Year() != expectedYear {
-		t.Errorf("expected '%v' but got '%v'", expectedYear, tsk.DoneAt.Year())
+	if tsk.ended.Year() != expectedYear {
+		t.Errorf("expected '%v' but got '%v'", expectedYear, tsk.ended.Year())
 	}
 }
 
 func TestNewFromBytesErr(t *testing.T) {
 	// setup - wellformed json bytes
-	tskStr := `{"type":"test-type","info":"test-info","created":"2000-01-01T01:01:00.01Z","result":"error","msg":"test msg","started":"2001-01-01T01:01:01Z","done":"2002-01-01T01:01:01Z"}`
+	tskStr := `{"type":"test-type","info":"test-info","created":"2000-01-01T01:01:00.01Z","result":"error","msg":"test msg","started":"2001-01-01T01:01:01Z","ended":"2002-01-01T01:01:01Z"}`
 	tsk, err := NewFromBytes([]byte(tskStr))
 	if err != nil {
 		t.Fatalf("malformed json: '%v'\n", err.Error())
@@ -165,14 +165,14 @@ func TestNewFromBytesErr(t *testing.T) {
 	}
 
 	// created date is populated
-	if tsk.CreatedAt == nil {
+	if tsk.created.IsZero() {
 		t.Fatal("created date should be populated")
 	}
 
 	// created date correct year
 	expectedYear := 2000
-	if tsk.CreatedAt.Year() != expectedYear {
-		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.CreatedAt.Year())
+	if tsk.created.Year() != expectedYear {
+		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.created.Year())
 	}
 
 	// correct result
@@ -188,25 +188,25 @@ func TestNewFromBytesErr(t *testing.T) {
 	}
 
 	// started date is populated
-	if tsk.StartedAt == nil {
+	if tsk.started.IsZero() {
 		t.Fatalf("started date should be populated")
 	}
 
 	// started date correct year
 	expectedYear = 2001
-	if tsk.StartedAt.Year() != expectedYear {
-		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.StartedAt.Year())
+	if tsk.started.Year() != expectedYear {
+		t.Errorf("expected '%v' but got '%v'\n", expectedYear, tsk.started.Year())
 	}
 
-	// done date is populated
-	if tsk.DoneAt == nil {
-		t.Fatal("done date should be populated")
+	// ended date is populated
+	if tsk.ended.IsZero() {
+		t.Fatal("ended date should be populated")
 	}
 
-	// done date correct year
+	// ended date correct year
 	expectedYear = 2002
-	if tsk.DoneAt.Year() != expectedYear {
-		t.Errorf("expected '%v' but got '%v'", expectedYear, tsk.DoneAt.Year())
+	if tsk.ended.Year() != expectedYear {
+		t.Errorf("expected '%v' but got '%v'", expectedYear, tsk.ended.Year())
 	}
 }
 
@@ -247,8 +247,8 @@ func TestTask_Bytes(t *testing.T) {
 	}
 
 	// correct created date
-	if newTsk.CreatedAt != tsk.CreatedAt {
-		t.Errorf("expected '%v' but got '%v'\n", tsk.CreatedAt, newTsk.CreatedAt)
+	if newTsk.Created != tsk.Created {
+		t.Errorf("expected '%v' but got '%v'\n", tsk.Created, newTsk.Created)
 	}
 
 	// correct result
@@ -262,22 +262,26 @@ func TestTask_Bytes(t *testing.T) {
 	}
 
 	// correct started date
-	if newTsk.StartedAt != tsk.StartedAt {
-		t.Errorf("expected '%v' but got '%v'\n", tsk.StartedAt, newTsk.StartedAt)
+	if newTsk.Started != tsk.Started {
+		t.Errorf("expected '%v' but got '%v'\n", tsk.Started, newTsk.Started)
 	}
 
-	// correct done date
-	if newTsk.DoneAt != tsk.DoneAt {
-		t.Errorf("expected '%v' but got '%v'\n", tsk.DoneAt, newTsk.DoneAt)
+	// correct ended date
+	if newTsk.Ended != tsk.Ended {
+		t.Errorf("expected '%v' but got '%v'\n", tsk.Ended, newTsk.Ended)
 	}
 
 	// correctly serialized "omitempty" fields
-	ts, _ := time.Parse(time.RFC3339, "2000-01-01T00:00:00Z")
-	tsk.CreatedAt = &ts
+	tsStr := "2000-01-01T00:00:00Z"
+	ts, _ := time.Parse(time.RFC3339, tsStr)
+	tsk.created = ts
+	tsk.Created = tsStr
 	tsk.Result = "test-result"
 	tsk.Msg = "test msg"
-	tsk.StartedAt = &ts
-	tsk.DoneAt = &ts
+	tsk.started = ts
+	tsk.Started = tsStr
+	tsk.ended = ts
+	tsk.Ended = tsStr
 
 	// no error
 	b, err = tsk.Bytes()
@@ -286,8 +290,8 @@ func TestTask_Bytes(t *testing.T) {
 	}
 
 	// correct byte count
-	// {"type":"test-type","info":"test-info","created":"2000-01-01T00:00:00Z","result":"test-result","msg":"test msg","started":"2000-01-01T00:00:00Z","done":"2000-01-01T00:00:00Z"}
-	expectedCnt = 175
+	// {"type":"test-type","info":"test-info","created":"2000-01-01T00:00:00Z","result":"test-result","msg":"test msg","started":"2000-01-01T00:00:00Z","ended":"2000-01-01T00:00:00Z"}
+	expectedCnt = 176
 	if len(b) != expectedCnt {
 		t.Errorf("expected '%v' but got '%v'\n", expectedCnt, len(b))
 	}
@@ -309,8 +313,8 @@ func TestTask_Bytes(t *testing.T) {
 	}
 
 	// correct created date
-	if !newTsk.CreatedAt.Equal(*tsk.CreatedAt) {
-		t.Errorf("expected '%v' but got '%v'\n", tsk.CreatedAt, newTsk.CreatedAt)
+	if !newTsk.created.Equal(tsk.created) {
+		t.Errorf("expected '%v' but got '%v'\n", tsk.created, newTsk.created)
 	}
 
 	// correct result
@@ -324,13 +328,13 @@ func TestTask_Bytes(t *testing.T) {
 	}
 
 	// correct started date
-	if !newTsk.StartedAt.Equal(*tsk.StartedAt) {
-		t.Errorf("expected '%v' but got '%v'\n", tsk.StartedAt, newTsk.StartedAt)
+	if !newTsk.started.Equal(tsk.started) {
+		t.Errorf("expected '%v' but got '%v'\n", tsk.started, newTsk.started)
 	}
 
-	// correct done date
-	if !newTsk.DoneAt.Equal(*tsk.DoneAt) {
-		t.Errorf("expected '%v' but got '%v'\n", tsk.DoneAt, newTsk.DoneAt)
+	// correct ended date
+	if !newTsk.ended.Equal(tsk.ended) {
+		t.Errorf("expected '%v' but got '%v'\n", tsk.ended, newTsk.ended)
 	}
 }
 
@@ -360,7 +364,7 @@ func TestResult_Start(t *testing.T) {
 
 	// populated started date
 	startedAt := tsk.Start()
-	if tsk.StartedAt == nil || tsk.StartedAt.IsZero() {
+	if tsk.started.IsZero() {
 		t.Errorf("started date should be populated")
 	}
 
@@ -371,16 +375,16 @@ func TestResult_Start(t *testing.T) {
 	}
 }
 
-func TestTask_Done(t *testing.T) {
+func TestTask_End(t *testing.T) {
 	// setup
 	tsk := New("test-type", "test-info")
 	result := Result("test-result")
 	msg := "test msg"
 
-	// correct done date
-	doneAt := tsk.Done(result, msg)
-	if tsk.DoneAt == nil || tsk.DoneAt.IsZero() {
-		t.Fatal("expected non-zero done date")
+	// correct ended date
+	ended := tsk.End(result, msg)
+	if tsk.ended.IsZero() {
+		t.Fatal("expected non-zero ended date")
 	}
 
 	// correct result
@@ -388,13 +392,13 @@ func TestTask_Done(t *testing.T) {
 		t.Errorf("expected '%v' but got '%v'\n", result, tsk.Result)
 	}
 
-	// correct done date - should not change after another done call
-	sameDoneAt := tsk.Done(result, msg)
-	if !doneAt.Equal(sameDoneAt) {
-		t.Errorf("expected '%v' but got '%v'\n", sameDoneAt, doneAt)
+	// correct ended date - should not change after another end call
+	sameEnded := tsk.End(result, msg)
+	if !ended.Equal(sameEnded) {
+		t.Errorf("expected '%v' but got '%v'\n", sameEnded, ended)
 	}
 
-	// correct msg - should not change after another done call
+	// correct msg - should not change after another end call
 	if tsk.Msg != msg {
 		t.Errorf("expected '%v' but got '%v'\n", msg, tsk.Msg)
 	}

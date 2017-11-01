@@ -177,9 +177,9 @@ func (c *LazyConsumer) Msg() (msg []byte, done bool, err error) {
 	return msg, done, err
 }
 
-// Close will close down all in-process activity
+// Stop will close down all in-process activity
 // and the nsq consumer.
-func (c *LazyConsumer) Close() error {
+func (c *LazyConsumer) Stop() error {
 	// close out all work in progress
 	close(c.closeChan)
 

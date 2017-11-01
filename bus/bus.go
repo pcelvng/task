@@ -9,15 +9,15 @@ import (
 )
 
 type Consumer interface {
-	Connect(topic, channel string) error
+	//Connect(topic, channel string) error
 	Msg() (msg []byte, done bool, err error)
-	Close() error
+	Stop() error
 }
 
 type Producer interface {
-	Connect() error
+	//Connect() error
 	Send(topic string, msg []byte) error
-	Close() error
+	Stop() error
 }
 
 var (

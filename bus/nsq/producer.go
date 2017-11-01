@@ -92,9 +92,21 @@ func (p *Producer) Send(topic string, msg []byte) error {
 	return producer.Publish(topic, msg)
 }
 
-func (p *Producer) Close() error {
+func (p *Producer) Stop() error {
 	if p.hostPool != nil {
 		p.hostPool.Close()
+	}
+
+	// close up all producers for in-flight produced messages
+	// Will tell all producers stop at once and then wait
+	// for them all to stop.
+	wg := sync.WaitGroup{}
+	for _, producer := range p.producers {
+		wg.Add(1)
+		go func() {
+			producer.Stop()
+			wg.Done()
+		}()
 	}
 
 	return nil
