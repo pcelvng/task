@@ -29,6 +29,7 @@ type Consumer struct {
 	sync.Mutex
 	readCloser io.ReadCloser
 	scanner    *bufio.Scanner
+	stopped    bool
 }
 
 func (c *Consumer) Connect(_, _ string) error {
@@ -43,6 +44,11 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	// Only one read from the file at a time
 	c.Lock()
 	defer c.Unlock()
+	if c.stopped {
+		// should not attempt to read if already stopped
+		done = true
+		return msg, done, nil
+	}
 
 	if c.scanner == nil {
 		return msg, done, errors.New("consumer has not connected")
@@ -60,7 +66,14 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	return msg, done, err
 }
 
-func (c *Consumer) Close() error {
+func (c *Consumer) Stop() error {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.stopped {
+		return nil
+	}
+	c.stopped = true
 	if err := c.readCloser.Close(); err != nil {
 		return err
 	}

@@ -5,20 +5,23 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/pcelvng/task/bus"
 )
 
 var (
-	defaultTimeout = time.Second * 10
+	defaultTimeout   = time.Second * 10
+	defaultDoneTopic = "done"
 )
 
 func NewConfig() *Config {
 	return &Config{
 		MaxInFlight: 1,
 		Timeout:     defaultTimeout,
+		LifetimeMax: 0, // not enabled by default
+		DoneTopic:   defaultDoneTopic,
+		TaskType:    "",
 	}
 }
 
@@ -28,9 +31,23 @@ type Config struct {
 	MaxInFlight int
 
 	// Timeout is how long the launcher will
-	// wait for a forced-shutdown worker to
-	// return a done task.
+	// wait for a forced-shutdown worker to cleanup.
 	Timeout time.Duration
+
+	// LifetimeMax - maximum number of tasks the
+	// launcher will process before closing.
+	LifetimeMax int
+
+	// DoneTopic - topic to publish to for done tasks.
+	// Default: "done"
+	DoneTopic string
+
+	// TaskType will check that the received task type
+	// matches TaskType and if not then will return the task
+	// with a task type mismatch error.
+	//
+	// If TaskType is empty then check will be skipped.
+	TaskType string
 }
 
 // NewLauncher returns a Launcher, context, cancelFunc.
@@ -40,7 +57,9 @@ type Config struct {
 // The calling routine can force the launcher to shutdown by calling
 // the cancelFunc and then listening on context.Done to know when
 // the Launcher has shutdown gracefully.
-func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Config) (*Launcher, context.Context, context.CancelFunc) {
+//
+// For an example worker application look in ./apps/workers/noop/main.go.
+func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Config) *Launcher {
 	// create config if none provided
 	if config == nil {
 		config = NewConfig()
@@ -65,62 +84,106 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Conf
 	}
 
 	// doneCncl (done cancel function)
-	// - is called by the launcher to signal that the launcher
-	// has completed shutting down.
+	// - is called internally by the launcher to signal that the launcher
+	// has COMPLETED shutting down.
 	//
 	// doneCtx (done context)
-	// - is for communicating that the launcher is done and
+	// - is for communicating externally that the launcher is DONE and
 	// has shutdown gracefully.
 	doneCtx, doneCncl := context.WithCancel(context.Background())
 
-	// create stop context and cancel func - for initiating launcher shutdown
+	// stop context and cancel func: shutdown launcher/workers
+	//
+	// stopCtx - launcher will listen on stopCtx.Done() for external forced shutdown.
+	// stopCncl - used externally of launcher to initiate forced launcher shutdown.
 	stopCtx, stopCncl := context.WithCancel(context.Background())
 
-	// create worker context and cancel func - for stopping active workers
-	wCtx, wCncl := context.WithCancel(context.Background())
+	// last context and cancel func - for indicating the last task
+	// is in progress.
+	//
+	// lastCtx - for communicating that the last message has been
+	// received and is currently being processed.
+	//
+	// lastCncl - for sending a signal indicating the last task has
+	// been received and is currently being processed.
+	lastCtx, lastCncl := context.WithCancel(context.Background())
 
 	return &Launcher{
-		conf:         config,
-		launchFunc:   lnchFn,
-		doneCtx:      doneCtx,
-		doneCncl:     doneCncl,
-		stopCtx:      stopCtx,
-		stopCncl:     stopCncl,
-		wCtx:         wCtx,
-		wCncl:        wCncl,
-		maxInFlight:  maxInFlight,
-		slots:        slots,
-		closeTimeout: timeout,
-		lastChan:     make(chan interface{}),
-		closedChan:   make(chan interface{}),
-		quitChan:     make(chan interface{}),
-	}, doneCtx, doneCncl
+		isInitialized: true,
+		conf:          config,
+		launchFunc:    lnchFn,
+		doneCtx:       doneCtx,
+		doneCncl:      doneCncl,
+		stopCtx:       stopCtx,
+		stopCncl:      stopCncl,
+		lastCtx:       lastCtx,
+		lastCncl:      lastCncl,
+		maxInFlight:   maxInFlight,
+		slots:         slots,
+		closeTimeout:  timeout,
+	}
 }
 
 type Launcher struct {
-	conf         *Config
-	consumer     bus.Consumer
-	producer     bus.Producer
-	launchFunc   LaunchFunc         // for launching new workers
-	doneCtx      context.Context    // launcher context (highest level context)
-	doneCncl     context.CancelFunc // launcher cancel func (calling it indicates the launcher has cleanly closed up)
-	stopCtx      context.Context    // for listening to launcher shutdown signal. Initiates shutdown process.
-	stopCncl     context.CancelFunc // for telling the launcher to shutdown. Initiates shutdown process. Shutdown is complete when doneCtx.Done() is closed
-	wCtx         context.Context    // for copying and giving to each new worker
-	wCncl        context.CancelFunc // for sending the shutdown signal to all workers
+	// will panic if not properly initialized with the NewLauncher function.
+	isInitialized bool
+
+	// isDoing indicates the launcher has already launched the task loop
+	isDoing bool
+
+	conf       *Config
+	consumer   bus.Consumer
+	producer   bus.Producer
+	launchFunc LaunchFunc // for launching new workers
+
+	// communicating launcher has finished shutting down
+	doneCtx  context.Context    // launcher context (highest level context)
+	doneCncl context.CancelFunc // launcher cancel func (calling it indicates the launcher has cleanly closed up)
+
+	// forcing workers/launcher to shut down
+	// all worker contexts inherit from stopCtx.
+	stopCtx  context.Context    // for listening to launcher shutdown signal. Initiates shutdown process.
+	stopCncl context.CancelFunc // for telling the launcher to shutdown. Initiates shutdown process. Shutdown is complete when doneCtx.Done() is closed
+
+	// indicate the last task is in progress
+	lastCtx  context.Context    // main loop will listen on lastCtx.Done() to know if the last task is in progress
+	lastCncl context.CancelFunc // called to indicate the last task is in progress
+
+	// closeTimeout tells the launcher how long to wait
+	// when forcing a task to close.
 	closeTimeout time.Duration
+
+	// completeTimeout for forcing a task to complete within a
+	// certain amount of time or force it to close.
+	// if value is not set then this feature is disabled
+	// and the launcher will wait indefinitely for a task
+	// to complete.
+	//
+	// if the completeTimeout is reached then the task is forced
+	// to close and will wait closeTimeout long before returning
+	// the task.
+	completeTimeout time.Duration
 
 	// wg is the wait group for communicating
 	// when all tasks are complete or have been
 	// shutdown.
 	sync.WaitGroup
 
-	// describes the maximum number of tasks
+	// maxInFlight describes the maximum number of tasks
 	// that the launcher will allow at one
 	// time.
 	//
 	// Must have a value greater than zero.
 	maxInFlight int
+
+	// remaining is decremented every time a new task
+	// is requested. When remaining reaches 0 the task
+	// requested is marked as the last and when it finishes
+	// the launcher will shutdown.
+	//
+	// If remaining is not set or set to a negative number
+	// then the launcher will not use a lifetime limit.
+	remaining int
 
 	// slots describes the number of slots
 	// available. Each slot represents a
@@ -128,155 +191,116 @@ type Launcher struct {
 	// if a task is available.
 	slots chan int
 
-	// last will be set to true when it is processing
-	// the last message. When the last message is
-	// in progress the lastChan will be closed and when
-	// the final task is complete the launcher will
-	// close down.
-	last     int64
-	lastChan chan interface{}
+	// closeErr is potentially set on shutdown
+	// if there was an err to communicate after
+	// shutdown is complete.
+	closeErr   error
+	sync.Mutex // managing safe access to closeErr
 }
 
-// Start will connect the receiver and start
-// the worker so that it is ready to accept tasks.
-func (l *Launcher) Start() (chan interface{}, error) {
-	// check if already started
-	if !atomic.CompareAndSwapInt64(&l.started, 0, 1) {
-		return l.closedChan, nil
+// DoTasks will start the task loop and immediately
+// begin working on tasks if any are available.
+//
+// The launcher assumes the producer and consumer
+// are fully initialized when the launcher is created.
+//
+// Will panic if not initialized with NewLauncher.
+//
+// Calling DoTasks more than once is safe but
+// will not do anything. If called more than once will
+// return a copy of the same context and cancel function
+// received the first time.
+func (l *Launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFunc) {
+	if !l.isInitialized {
+		panic("launcher not correctly initialized!")
 	}
 
-	closedChan := make(chan interface{})
-	l.closedChan = closedChan
-
-	// get the receiver ready
-	if err := l.receiver.Connect(); err != nil {
-		return l.closedChan, err
-	}
-	return l.closedChan, nil
-}
-
-// Do will get tasks from the receiver
-// and pass the tasks to the worker.
-//
-// It goes without saying that Do needs
-// to be called after Start
-//
-// Calling Do more than once is safe but
-// will not do anything.
-func (l *Launcher) Do() {
-	if l.doing {
-		return
+	if l.isDoing {
+		return l.doneCtx, l.stopCncl
 	}
 	go l.do()
 
-	l.doing = true
+	l.isDoing = true
+	return l.doneCtx, l.stopCncl
 }
 
-// do will check if maxInFlight has been reached.
-// If maxInFlight has not been reached then it listens
-// for a task and when a task is received it will
-// - reached maxInFlight?
-//   - yes: wait for a task to complete then check again
-//   - no: then get a new task
-// - when a new task is received then send it
-//   to the worker for completion.
-// - if trying to get a task returns an error
-//   log the error and try to get another task.
-// - if a task is the last one then pass it on
-//   to the worker, do not accept any more tasks
-//   and when all the tasks have finished close
-//   the launcher.
+// do is the main task loop.
 func (l *Launcher) do() {
-	// task loop
-	//
-	// receivers are lazy - they lazy load
-	// but workers are greedy - if there
-	// is a task available a worker will
-	// work on it right away. But a task
-	// will only be requested if there
-	// is a worker slot available to work on it.
+	defer l.doneCncl()
+
 	for {
 		select {
-		case <-l.quitChan:
-			return
-		case <-l.lastChan:
-			// make sure call l.Wait()
-			// before l.Close() or else
-			// the tasks will be forced
-			// to close without completing.
+
+		// either done case will close the do loop
+		// in the same way at the task loop level.
+		case <-l.stopCtx.Done():
+		case <-l.lastCtx.Done():
+			// close the consumer
+			if err := l.consumer.Stop(); err != nil {
+				l.Lock()
+				l.closeErr = err
+				l.Unlock()
+			}
+
+			// wait for workers to close up and send
+			// task responses.
 			l.Wait()
-			l.Close()
+
+			// stop the producer
+			if err := l.producer.Stop(); err != nil {
+				l.Lock()
+				l.closeErr = err
+				l.Unlock()
+			}
+
 			return
 
 		// request another task
 		// if there is a slot available
 		case <-l.slots:
-			l.next()
+			l.Lock()
+			if l.remaining > 0 {
+				l.remaining = l.remaining - 1
+			}
+			if l.remaining == 0 {
+				// the message about to be requested will
+				// be the last one.
+				l.lastCncl()
+			}
+			l.Unlock()
+
+			// next() needs to be non-blocking so
+			// the application can shut down when asked to.
+			go l.next()
 		}
 	}
 }
 
-// next will handle processing the next
-// task. Namely it will make sure that only
-// the maximum possible number of tasks in
-// progress does not exceed the maxInFlight
-// value.
-//
-// If next receives an error from the receiver
-// then it will log the error.
-//
-// If next gets an error from the receiver it will
-// log the error wait for a minute and try getting
-// another task.
-//
-// - a new task is allowed (maxInFlight not reached yet)
-// - the last task has not already been received.
+// next handles getting and processing the next task.
 func (l *Launcher) next() {
 	tskB, done, err := l.consumer.Msg()
+	if done {
+		l.lastCncl()
+	}
+	if err != nil {
+		log.Println(err.Error())
+		l.giveBackSlot()
 
-	// make task from bytes
+		return
+	}
+
 	tsk, err := NewFromBytes(tskB)
 	if err != nil {
-		// can't do anything with a bad tsk.
-		// log the message and wait for the next one.
 		log.Println(err.Error())
 		l.giveBackSlot()
 
 		return
 	}
 
-	if err != nil {
-		log.Println(err.Error())
-
-		// close up shop if all done.
-		if done {
-			if atomic.CompareAndSwapInt64(&l.last, 0, 1) {
-				close(l.lastChan)
-			}
-		}
-
-		// an error means there is no task so just return.
-		l.giveBackSlot()
-		return
-	}
-
-	// do task
+	// launch worker and do task
 	if tsk != nil {
 		go l.doLaunch(tsk)
 	}
-
-	// close up shop if all done.
-	if done {
-		if atomic.CompareAndSwapInt64(&l.last, 0, 1) {
-			close(l.lastChan)
-		}
-	}
-}
-
-// giveSlot will attempt to give back a slot.
-// needs to be used with care to prevent locks.
-func (l *Launcher) giveBackSlot() {
-	l.slots <- 1
 }
 
 // doLaunch will safely handle the wait
@@ -285,73 +309,89 @@ func (l *Launcher) giveBackSlot() {
 func (l *Launcher) doLaunch(tsk *Task) {
 	l.Add(1)
 	defer l.Done() // wg done
-	ctx, _ := context.WithCancel(l.ctx)
+	defer l.giveBackSlot()
 
-	worker := l.launchFunc(*tsk, ctx)
-	tskDone := make(chan Task)
+	var wCtx context.Context
+	var cncl context.CancelFunc
+	if l.completeTimeout > time.Duration(0) {
+		wCtx, cncl = context.WithTimeout(l.stopCtx, l.completeTimeout)
+	} else {
+		wCtx, cncl = context.WithCancel(l.stopCtx)
+	}
+	defer cncl() // make sure to clean up worker context
+
+	tsk.Start()
+	defer l.sendTsk(tsk)
+
+	// check task type (if TaskType specified)
+	if l.conf.TaskType != "" && l.conf.TaskType != tsk.Type {
+		msg := fmt.Sprintf("wrong task type; expected '%v'", l.conf.TaskType)
+		tsk.End(ErrResult, msg)
+		return
+	}
+
+	worker := l.launchFunc(tsk.Info, wCtx)
+	doneChan := make(chan interface{})
 	go func() {
-		tskDone <- worker.DoTask()
+		result, msg := worker.DoTask()
+		tsk.End(result, msg)
+		close(doneChan)
 	}()
 
 	select {
-	case tsk = <-tskDone:
-		// send task back to the receiver
-		l.receiver.Done(tsk)
-
-		// give back the slot so that the next task
-		// can be launched.
-		l.giveBackSlot()
-
-		return
-	case <-l.ctx.Done():
-		// wait for the task to close out
-		// cleanly but only wait as long
-		// as the timeout permits.
+	case <-doneChan:
+		break
+	case <-wCtx.Done():
+		// let worker clean up.
 		tckr := time.NewTicker(l.closeTimeout)
 		select {
-		case tsk = <-tskDone:
+		case <-doneChan:
 			tckr.Stop()
-			l.receiver.Done(tsk)
-			return
+
+			break
 		case <-tckr.C:
-			// only case where the launcher will
-			// manage task state beyond malformed incoming
-			// tasks.
-			msg := fmt.Sprintf("worker closed from timeout; waited '%v'", l.closeTimeout.String())
+			msg := fmt.Sprintf("worker forced to close; waited '%v'", l.closeTimeout.String())
 			tsk.End(ErrResult, msg)
-			l.receiver.Done(tsk)
-			return
+
+			break
 		}
+		break
+	}
+	return
+}
+
+func (l *Launcher) sendTsk(tsk *Task) {
+	tskB, err := tsk.Bytes() // End() should already be called
+	if err != nil {
+		log.Println(err.Error())
+	} else {
+		l.producer.Send(l.conf.DoneTopic, tskB)
 	}
 }
 
-// shutdown will do a graceful shutdown and log
-// any errors received in the process.
-func (l *Launcher) shutdown() error {
-	// check that Start was called
-	if atomic.LoadInt64(&l.started) != int64(1) {
-		return nil
+// giveSlot will attempt to give back a slot.
+// needs to be used with correct accounting
+// practices or will lock up.
+//
+// will not give back the slot if the application is
+// shutting down or processing the last task.
+func (l *Launcher) giveBackSlot() {
+	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
+		l.slots <- 1
 	}
+}
 
-	// check that Close hasn't already been called
-	if !atomic.CompareAndSwapInt64(&l.isClosed, 0, 1) {
-		return nil // already called
-	}
-
-	// close the task loop and shutdown
-	// all workers. Give all the workers
-	// a chance to close cleanly up until
-	// the timeout is reached.
-	// close(l.quitChan)
-	l.cnclFn()
-	l.Wait()
-	defer close(l.closedChan)
-
-	// finally, close the receiver
-	// all task responses should have already
-	// processed.
-	if err := l.receiver.Close(); err != nil {
-		return err
+// Err can be called after the launcher has
+// communicated it has finished shutting down.
+//
+// If it's called before shutdown then will return
+// nil. Will return the same error on subsequent
+// calls.
+func (l *Launcher) Err() error {
+	l.Lock()
+	defer l.Unlock()
+	if l.doneCtx.Err() == nil {
+		return l.closeErr
 	}
 
 	return nil

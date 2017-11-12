@@ -9,13 +9,11 @@ import (
 )
 
 type Consumer interface {
-	//Connect(topic, channel string) error
 	Msg() (msg []byte, done bool, err error)
 	Stop() error
 }
 
 type Producer interface {
-	//Connect() error
 	Send(topic string, msg []byte) error
 	Stop() error
 }

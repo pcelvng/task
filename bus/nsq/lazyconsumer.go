@@ -4,6 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"context"
+
 	gonsq "github.com/bitly/go-nsq"
 )
 
@@ -15,11 +17,16 @@ func NewLazyConsumer(c *Config) (*LazyConsumer, error) {
 	nsqConf := gonsq.NewConfig()
 	nsqConf.MaxInFlight = maxInFlight
 
+	// create context
+	ctx, cncl := context.WithCancel(context.Background())
+
 	lc := &LazyConsumer{
 		conf:      c,
 		nsqConf:   nsqConf,
 		closeChan: make(chan interface{}),
 		msgChan:   make(chan []byte),
+		ctx:       ctx,
+		cncl:      cncl,
 	}
 
 	return lc, nil
@@ -50,6 +57,11 @@ type LazyConsumer struct {
 
 	// mutex for updating consumer maxInFlight
 	sync.Mutex
+
+	stopped bool
+
+	ctx  context.Context
+	cncl context.CancelFunc
 }
 
 // connect will connect nsq. An error is returned if there
@@ -153,7 +165,7 @@ func (c *LazyConsumer) HandleMessage(msg *gonsq.Message) error {
 	// or else the calling application risks that the message
 	// reaches the timeout limit and is re-queued.
 	select {
-	case <-c.closeChan:
+	case <-c.ctx.Done():
 		// requeue so message is not lost during shutdown
 		msg.Requeue(-1)
 		return nil
@@ -167,8 +179,16 @@ func (c *LazyConsumer) HandleMessage(msg *gonsq.Message) error {
 
 // Msg will block until it receives one and only one message.
 //
-// Msg is safe to call concurrently.
+// Safe to call concurrently.
 func (c *LazyConsumer) Msg() (msg []byte, done bool, err error) {
+	c.Lock()
+	defer c.Unlock()
+	if c.stopped {
+		// should not attempt to read if already stopped
+		done = true
+		return msg, done, nil
+	}
+
 	c.reqMsg() // request message
 
 	// wait for a message
@@ -177,9 +197,21 @@ func (c *LazyConsumer) Msg() (msg []byte, done bool, err error) {
 	return msg, done, err
 }
 
+func (c *LazyConsumer) Stop() error {
+	c.cncl()
+	return nil
+}
+
 // Stop will close down all in-process activity
 // and the nsq consumer.
-func (c *LazyConsumer) Stop() error {
+func (c *LazyConsumer) stop() error {
+	c.Lock()
+	defer c.Unlock()
+	if c.stopped {
+		return nil
+	}
+	c.stopped = true
+
 	// close out all work in progress
 	close(c.closeChan)
 

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 
+	"fmt"
+
 	"github.com/bitly/go-hostpool"
 	gonsq "github.com/bitly/go-nsq"
 )
@@ -28,6 +30,8 @@ type Producer struct {
 
 	// mutex for hostpool access
 	sync.Mutex
+
+	stopped bool
 }
 
 // Connect will connect to all the nsqds
@@ -74,6 +78,15 @@ func (p *Producer) Connect() error {
 }
 
 func (p *Producer) Send(topic string, msg []byte) error {
+	p.Lock()
+	defer p.Unlock()
+
+	// should not attempt to send if producer already stopped.
+	if p.stopped {
+		errMsg := fmt.Sprintf("unable to send '%v'; producer already stopped", string(msg))
+		return errors.New(errMsg)
+	}
+
 	if p.producers == nil || len(p.producers) == 0 {
 		return errors.New("no producers to send to")
 	}
@@ -93,6 +106,14 @@ func (p *Producer) Send(topic string, msg []byte) error {
 }
 
 func (p *Producer) Stop() error {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.stopped {
+		return nil
+	}
+	p.stopped = true
+
 	if p.hostPool != nil {
 		p.hostPool.Close()
 	}

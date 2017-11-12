@@ -2,6 +2,8 @@ package io
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -30,30 +32,45 @@ type Producer struct {
 	sync.Mutex
 	writeCloser io.WriteCloser
 	writer      *bufio.Writer
+	stopped     bool
 }
 
-func (c *Producer) Connect() error {
+func (p *Producer) Connect() error {
 	return nil
 }
 
-func (c *Producer) Send(_ string, msg []byte) error {
+func (p *Producer) Send(_ string, msg []byte) error {
 	if (len(msg) == 0) || (msg[len(msg)-1] != '\n') {
 		msg = append(msg, '\n')
 	}
 
-	c.Lock()
-	defer c.Unlock()
-	_, err := c.writer.Write(msg)
+	p.Lock()
+	defer p.Unlock()
+
+	// should not attempt to send if producer already stopped.
+	if p.stopped {
+		errMsg := fmt.Sprintf("unable to send '%v'; producer already stopped", string(msg))
+		return errors.New(errMsg)
+	}
+
+	_, err := p.writer.Write(msg)
 	if err != nil {
 		return err
 	}
-	c.writer.Flush()
+	p.writer.Flush()
 
 	return err
 }
 
-func (c *Producer) Close() error {
-	if err := c.writeCloser.Close(); err != nil {
+func (p *Producer) Stop() error {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.stopped {
+		return nil
+	}
+	p.stopped = true
+	if err := p.writeCloser.Close(); err != nil {
 		return err
 	}
 
