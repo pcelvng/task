@@ -9,35 +9,36 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pcelvng/task/util"
+	"github.com/pcelvng/task/bus"
 )
 
 var (
-	taskType   = flag.String("type", "", "REQUIRED; the task type")
-	t          = flag.String("t", "", "alias of 'type'")
-	at         = flag.String("at", "", "alias of 'from' flag")
-	from       = flag.String("from", "now", "format 'yyyy-mm-ddThh' (example: '2017-01-03T01'). Allows a special keyword 'now'.")
-	to         = flag.String("to", "", "same format as 'from'; if not specified, will run the one hour specified by from")
-	taskBus    = flag.String("bus", "stdout", "one of 'stdout', 'file', 'nsq'")
-	b          = flag.String("b", "", "alias of 'bus'")
-	outFile    = flag.String("out-file", "./out.tasks.json", "file bus path and name when 'file' task-bus specified")
-	nsqdHosts  = flag.String("nsqd-hosts", "localhost:4150", "comma-separated list of nsqd hosts with port")
-	template   = flag.String("template", "{yyyy}-{mm}-{dd}T{hh}:00", "task template")
-	topic      = flag.String("topic", "", "overrides task type as the default topic")
-	skipXHours = flag.Uint("skip-x-hours", 0, "will generate tasks skipping x hours")
-	onHours    = flag.String("on-hours", "", "comma separated list of hours to indicate which hours of a day to backload during a 24 period (each value must be between 0-23). Example '0,4,15' - will only generate tasks on hours 0, 4 and 15")
+	taskType    = flag.String("type", "", "REQUIRED; the task type")
+	t           = flag.String("t", "", "alias of 'type'")
+	at          = flag.String("at", "", "alias of 'from' flag")
+	from        = flag.String("from", "now", "format 'yyyy-mm-ddThh' (example: '2017-01-03T01'). Allows a special keyword 'now'.")
+	to          = flag.String("to", "", "same format as 'from'; if not specified, will run the one hour specified by from. Allows special keyword 'now'.")
+	outBus      = flag.String("bus", "stdout", "one of 'stdout', 'file', 'nsq'")
+	b           = flag.String("b", "", "alias of 'bus'")
+	outFile     = flag.String("out-file", "./out.tasks.json", "file bus path and name when 'file' task-bus specified")
+	nsqdHosts   = flag.String("nsqd-hosts", "localhost:4150", "comma-separated list of nsqd hosts with port")
+	template    = flag.String("template", "{yyyy}-{mm}-{dd}T{hh}:00", "task template")
+	topic       = flag.String("topic", "", "overrides task type as the default topic")
+	everyXHours = flag.Uint("every-x-hours", 0, "will generate a task every x hours. Includes the first hour. Can be combined with 'on-hours' and 'off-hours' options.")
+	onHours     = flag.String("on-hours", "", "comma separated list of hours to indicate which hours of a day to back-load during a 24 period (each value must be between 0-23). Order doesn't matter. Duplicates don't matter. Example: '0,4,15' - will only generate tasks on hours 0, 4 and 15")
+	offHours    = flag.String("off-hours", "", "comma separated list of hours to indicate which hours of a day to NOT create a task (each value must be between 0-23). Order doesn't matter. Duplicates don't matter. If used will trump 'on-hours' values. Example: '2,9,16' - will generate tasks for all hours except 2, 9 and 16.")
 
 	dFmt = "2006-01-02T15"
 )
 
 func NewConfig() *Config {
 	return &Config{
-		BusesConfig: &util.BusesConfig{},
+		BusConfig: bus.NewBusConfig(""),
 	}
 }
 
 type Config struct {
-	*util.BusesConfig
+	*bus.BusConfig
 
 	Start time.Time // start of backload
 	End   time.Time // end of backload
@@ -46,9 +47,9 @@ type Config struct {
 	TaskType     string
 	TaskTemplate string
 
-	// TODO: implement SkipXHours and OnHours
-	SkipXHours int
-	OnHours    []int // each value from 0-23
+	EveryXHours int    // default skips 0 hours aka does all hours. Will always at least create a task for the start date.
+	OnHours     []bool // each key represents the hour and bool is if that value is turned on. (not specified means all hours are ON)
+	OffHours    []bool // each key represents the hour and bool is if that value is turned off.
 }
 
 // NsqdHostsString will set Config.NsqdHosts from a comma
@@ -57,32 +58,57 @@ func (c *Config) NsqdHostsString(hosts string) {
 	c.NsqdHosts = strings.Split(hosts, ",")
 }
 
-// OnEveryString will attempt to convert a comma-separated
-// string of int values. Will return error if one or values
-// does not convert to to int.
-func (c *Config) OnHoursString(onHours string) error {
-	if onHours == "" {
-		return nil
+// SetOnHours will parse onHours string and set
+// OnHours value.
+func (c *Config) SetOnHours(onHours string) error {
+	hrs, err := parseHours(onHours)
+	if err != nil {
+		return err
+	}
+
+	c.OnHours = hrs
+	return nil
+}
+
+// SetOffHours will parse onHours string and set
+// OnHours value.
+func (c *Config) SetOffHours(offHours string) error {
+	hrs, err := parseHours(offHours)
+	if err != nil {
+		return err
+	}
+
+	c.OffHours = hrs
+	return nil
+}
+
+func parseHours(hrsStr string) (hrs []bool, err error) {
+	// make hrs exactly 24 slots
+	hrs = make([]bool, 24)
+
+	if hrsStr == "" {
+		return hrs, err
 	}
 
 	// basic sanitation - remove spaces
-	onHours = strings.Replace(onHours, " ", "", -1)
-	hoursStr := strings.Split(onHours, ",")
+	hrsStr = strings.Replace(hrsStr, " ", "", -1)
 
-	var hours []int
-	for _, hour := range hoursStr {
-		hourInt, err := strconv.Atoi(hour)
+	// convert, sort, de-duplicate
+	for _, hour := range strings.Split(hrsStr, ",") {
+		hr, err := strconv.Atoi(hour)
 		if err != nil {
-			return errors.New(
-				fmt.Sprintf("invalid hour value '%v' in '-on-hour' flag", hour))
+			return hrs, errors.New(
+				fmt.Sprintf("invalid hour value '%v'", hour))
 		}
-
-		hours = append(hours, hourInt)
+		if 0 <= hr && hr <= 23 {
+			hrs[hr] = true
+		} else {
+			return hrs, errors.New(
+				fmt.Sprintf("invalid hour value '%v' must be int between 0 and 23", hour))
+		}
 	}
 
-	c.OnHours = hours
-
-	return nil
+	return hrs, nil
 }
 
 func (c *Config) DateRangeStrings(start, end string) error {
@@ -93,7 +119,7 @@ func (c *Config) DateRangeStrings(start, end string) error {
 		return err
 	}
 
-	// round to hour and assign
+	// truncate to hour and assign
 	c.Start = s.Truncate(time.Hour)
 
 	// start and end are equal if end not provided
@@ -115,43 +141,9 @@ func (c *Config) DateRangeStrings(start, end string) error {
 }
 
 func (c *Config) Validate() error {
-	// Start required
-	if c.Start.IsZero() {
-		return errors.New("'from' date required")
-	}
-
-	// End required
-	if c.End.IsZero() {
-		return errors.New("'to' date required")
-	}
-
-	// Start before End
-	// TODO: make this not a requirement but use the start-end order to determine task creation order.
-	diff := int(c.End.Sub(c.Start))
-	if diff < 0 {
-		return errors.New("'start' must occur before 'end' date")
-	}
-
 	// TaskType is required
 	if c.TaskType == "" {
-		return errors.New("flag 'task-type' required")
-	}
-
-	// SkipEvery must be a positive integer
-	if c.SkipXHours < 0 {
-		return errors.New("'-skip-x-hours' must be positive")
-	}
-
-	// OnHours values must be positive value from 0-23
-	for _, hour := range c.OnHours {
-		if hour < 0 || hour > 23 {
-			return errors.New("flag '-on-hour' values must be integers from 0-23")
-		}
-	}
-
-	// cannot specify both 'SkipXHours' and 'OnHours'
-	if c.SkipXHours > 0 && len(c.OnHours) > 0 {
-		return errors.New("cannot specify both 'skip-x-hours' and 'on-hours' flags")
+		return errors.New("flag '-type' or '-t' required")
 	}
 
 	return nil
@@ -164,12 +156,16 @@ func LoadConfig() (*Config, error) {
 	c := NewConfig()
 	c.TaskType = *taskType
 	c.TaskTemplate = *template
-	c.SkipXHours = int(*skipXHours)
+	c.EveryXHours = int(*everyXHours)
 	c.Topic = *topic
-	c.OutBus = *taskBus
+	c.OutBus = *outBus
 	c.OutFile = *outFile
 	c.NsqdHostsString(*nsqdHosts)
-	if err := c.OnHoursString(*onHours); err != nil {
+	if err := c.SetOnHours(*onHours); err != nil {
+		return nil, err
+	}
+
+	if err := c.SetOffHours(*offHours); err != nil {
 		return nil, err
 	}
 
@@ -179,7 +175,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	if *b != "" {
-		c.Bus = *b
+		c.OutBus = *b
 	}
 
 	from := *from

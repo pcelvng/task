@@ -25,7 +25,10 @@ apps/workers/hello-world/hello-world
 
 # development and usage debris
 bus/nsq/*.dat
+apps/taskmasters/cron/config.toml
 apps/taskmasters/cron/*.json
+apps/taskmasters/retry/config.toml
 apps/taskmasters/retry/*.json
 apps/taskmasters/backloader/*.json
 apps/workers/noop/*.json
+apps/workers/hello-world/tsk.json

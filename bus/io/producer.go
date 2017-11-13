@@ -2,6 +2,7 @@ package io
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,9 +11,14 @@ import (
 )
 
 func NewStdoutProducer() *Producer {
+	// create context for clean shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
 	return &Producer{
 		writeCloser: os.Stdout,
 		writer:      bufio.NewWriter(os.Stdout),
+		ctx:         ctx,
+		cncl:        cncl,
 	}
 }
 
@@ -22,9 +28,14 @@ func NewFileProducer(path string) (*Producer, error) {
 		return nil, err
 	}
 
+	// create context for clean shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
 	return &Producer{
 		writeCloser: f,
 		writer:      bufio.NewWriter(f),
+		ctx:         ctx,
+		cncl:        cncl,
 	}, nil
 }
 
@@ -32,11 +43,8 @@ type Producer struct {
 	sync.Mutex
 	writeCloser io.WriteCloser
 	writer      *bufio.Writer
-	stopped     bool
-}
-
-func (p *Producer) Connect() error {
-	return nil
+	ctx         context.Context
+	cncl        context.CancelFunc
 }
 
 func (p *Producer) Send(_ string, msg []byte) error {
@@ -47,8 +55,8 @@ func (p *Producer) Send(_ string, msg []byte) error {
 	p.Lock()
 	defer p.Unlock()
 
-	// should not attempt to send if producer already stopped.
-	if p.stopped {
+	// should not attempt to send if already stopped.
+	if p.ctx.Err() != nil {
 		errMsg := fmt.Sprintf("unable to send '%v'; producer already stopped", string(msg))
 		return errors.New(errMsg)
 	}
@@ -63,13 +71,11 @@ func (p *Producer) Send(_ string, msg []byte) error {
 }
 
 func (p *Producer) Stop() error {
-	p.Lock()
-	defer p.Unlock()
-
-	if p.stopped {
+	if p.ctx.Err() != nil {
 		return nil
 	}
-	p.stopped = true
+	p.cncl()
+
 	if err := p.writeCloser.Close(); err != nil {
 		return err
 	}

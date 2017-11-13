@@ -12,10 +12,9 @@ import (
 	"github.com/robfig/cron"
 
 	"github.com/pcelvng/task/bus"
-	"github.com/pcelvng/task/util"
 )
 
-var config = flag.String("config", "", "relative or absolute file path")
+var config = flag.String("config", "config.toml", "relative or absolute file path")
 
 func main() {
 	flag.Parse()
@@ -31,7 +30,7 @@ func main() {
 	}
 
 	// make producer
-	p, err := util.NewProducer(conf.BusesConfig)
+	p, err := bus.NewProducer(conf.BusConfig)
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)
@@ -41,12 +40,6 @@ func main() {
 	c, err := MakeCron(conf.Rules, p)
 	if err != nil {
 		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	// connect the producer
-	if err := p.Connect(); err != nil {
-		log.Printf("err on producer connect: '%v'\n", err.Error())
 		os.Exit(1)
 	}
 
@@ -64,7 +57,7 @@ func main() {
 		c.Stop()
 
 		// close the producer
-		if err := p.Close(); err != nil {
+		if err := p.Stop(); err != nil {
 			log.Printf("err closing producer: '%v'\n", err.Error())
 			os.Exit(1)
 		}

@@ -1,21 +1,28 @@
 package main
 
 import (
-	"github.com/BurntSushi/toml"
-
 	"time"
 
-	"github.com/pcelvng/task/util"
+	"github.com/BurntSushi/toml"
+
+	"github.com/pcelvng/task/bus"
+)
+
+var (
+	defaultDoneTopic   = "done"
+	defaultDoneChannel = "retry"
 )
 
 func NewConfig() *Config {
 	return &Config{
-		BusesConfig: &util.BusesConfig{},
+		BusConfig:   bus.NewBusConfig(""),
+		DoneTopic:   defaultDoneTopic,
+		DoneChannel: defaultDoneChannel,
 	}
 }
 
 type Config struct {
-	*util.BusesConfig
+	*bus.BusConfig
 
 	// topic and channel to listen to
 	// done tasks for retry review.
@@ -27,10 +34,10 @@ type Config struct {
 }
 
 type RetryRule struct {
-	TaskType string   `toml:"task_type"`
-	Retries  int      `toml:"retries"`
-	Wait     duration `toml:"wait"`
-	Topic    string   `toml:"topic"` // topic override
+	TaskType string   `toml:"type"`
+	Retries  int      `toml:"retry"`
+	Wait     duration `toml:"wait"`  // duration to wait before creating and sending new task
+	Topic    string   `toml:"topic"` // topic override (default is TaskType value)
 }
 
 type duration struct {

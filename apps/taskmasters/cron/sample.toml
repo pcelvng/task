@@ -6,7 +6,7 @@ bus = "" # "" (stdout), "stdout" (default), "file", "nsq"
 type = "task-type" # REQUIRED # acts as default topic
 cron = "* * * * *" # REQUIRED # s m h mday m wday (https://godoc.org/github.com/robfig/cron)
 template = "{yyyy}/{mm}/{dd}/{hh}" # REQUIRED '{}' values are datetime template values
-offset = -2 # hour offset
+offset = 0 # hour offset
 topic = "task-topic" # override task type as the topic
 
 # SAMPLE RULE SET

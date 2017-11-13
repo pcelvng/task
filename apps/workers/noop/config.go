@@ -1,17 +1,17 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"strings"
 	"time"
 
-	"github.com/pcelvng/task/util"
-	"errors"
+	"github.com/pcelvng/task/bus"
 )
 
 var (
 	tskType      = flag.String("type", "", "REQUIRED the task type; default topic")
-	bus          = flag.String("bus", "stdio", "'stdio', 'file', 'nsq'")
+	msgBus       = flag.String("bus", "stdio", "'stdio', 'file', 'nsq'")
 	inBus        = flag.String("in-bus", "", "one of 'stdin', 'file', 'nsq'; useful if you want the in and out bus to be different types.")
 	outBus       = flag.String("out-bus", "", "one of 'stdout', 'file', 'nsq'; useful if you want the in and out bus to be different types.")
 	inFile       = flag.String("in-file", "./in.tsks.json", "file bus path and name when 'file' task-bus specified")
@@ -29,12 +29,12 @@ var (
 
 func NewConfig() *Config {
 	return &Config{
-		BusesConfig: &util.BusesConfig{},
+		BusConfig: bus.NewBusConfig(),
 	}
 }
 
 type Config struct {
-	*util.BusesConfig
+	*bus.BusConfig
 
 	TaskType    string        // will be used as the default topic and channel
 	Topic       string        // topic override (uses 'TaskType' if not provided)
@@ -97,7 +97,7 @@ func LoadConfig() *Config {
 
 	// load config
 	c := NewConfig()
-	c.Bus = *bus
+	c.Bus = *msgBus
 	c.InBus = *inBus
 	c.OutBus = *outBus
 	c.InFile = *inFile

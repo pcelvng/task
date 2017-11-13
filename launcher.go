@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -15,17 +16,28 @@ var (
 	defaultDoneTopic = "done"
 )
 
-func NewConfig() *Config {
-	return &Config{
+func NewLauncherConfig() *LauncherConfig {
+
+	return &LauncherConfig{
 		MaxInFlight: 1,
 		Timeout:     defaultTimeout,
 		LifetimeMax: 0, // not enabled by default
 		DoneTopic:   defaultDoneTopic,
 		TaskType:    "",
+		Logger:      log.New(os.Stderr, "", log.LstdFlags),
 	}
 }
 
-type Config struct {
+// NewLauncherBusConfig will create a new ConfigWBus; busType
+// is optional and if not provided will default to 'stdio'.
+func NewLauncherBusConfig(busType string) *LauncherBusConfig {
+	return &LauncherBusConfig{
+		BusConfig:      bus.NewBusConfig(busType),
+		LauncherConfig: NewLauncherConfig(),
+	}
+}
+
+type LauncherConfig struct {
 	// MaxInFlight is the max number tasks
 	// in progress at one time.
 	MaxInFlight int
@@ -48,21 +60,25 @@ type Config struct {
 	//
 	// If TaskType is empty then check will be skipped.
 	TaskType string
+
+	// custom logger option
+	Logger *log.Logger
 }
 
-// NewLauncher returns a Launcher, context, cancelFunc.
-// The calling routine should listen on context.Done to know if
-// the Launcher has shut itself down.
-//
-// The calling routine can force the launcher to shutdown by calling
-// the cancelFunc and then listening on context.Done to know when
-// the Launcher has shutdown gracefully.
-//
-// For an example worker application look in ./apps/workers/noop/main.go.
-func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Config) *Launcher {
+// LauncherBusConfig is a convenience config for
+// initializing a launcher with a producer and consumer
+// from bus.BusConfig
+type LauncherBusConfig struct {
+	*bus.BusConfig
+	*LauncherConfig
+}
+
+// NewLauncher returns a Launcher from the provided
+// consumer and producer.
+func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *LauncherConfig) *Launcher {
 	// create config if none provided
 	if config == nil {
-		config = NewConfig()
+		config = NewLauncherConfig()
 	}
 
 	// make sure maxInFlight is at least 1
@@ -108,10 +124,18 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Conf
 	// been received and is currently being processed.
 	lastCtx, lastCncl := context.WithCancel(context.Background())
 
+	// make sure logger is not nil
+	if config.Logger == nil {
+		config.Logger = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
 	return &Launcher{
 		isInitialized: true,
+		consumer:      c,
+		producer:      p,
 		conf:          config,
 		launchFunc:    lnchFn,
+		logger:        config.Logger,
 		doneCtx:       doneCtx,
 		doneCncl:      doneCncl,
 		stopCtx:       stopCtx,
@@ -124,6 +148,35 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Conf
 	}
 }
 
+// NewLauncherWBus is a convenience initializer that will create a
+// consumer and producer along with the launcher from a single config.
+// For added convenience, conf is optional and if not provided will
+// launch a consumer and producer with defaults.
+func NewLauncherWBus(lnchFn LaunchFunc, conf *LauncherBusConfig) (*Launcher, error) {
+	if conf == nil {
+		conf = NewLauncherBusConfig("")
+	}
+
+	// create consumer and producer
+	c, p, err := bus.NewConsumerProducer(conf.BusConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewLauncher(c, p, lnchFn, conf.LauncherConfig), nil
+}
+
+// Launcher handles the heavy lifting of worker lifecycle, general
+// task management and interacting with the bus.
+//
+// The calling routine should listen on context.Done to know if
+// the Launcher has shut itself down.
+//
+// The calling routine can force the launcher to shutdown by calling
+// the cancelFunc and then listening on context.Done to know when
+// the Launcher has shutdown gracefully.
+//
+// For an example worker application look in ./apps/workers/noop/main.go.
 type Launcher struct {
 	// will panic if not properly initialized with the NewLauncher function.
 	isInitialized bool
@@ -131,10 +184,11 @@ type Launcher struct {
 	// isDoing indicates the launcher has already launched the task loop
 	isDoing bool
 
-	conf       *Config
+	conf       *LauncherConfig
 	consumer   bus.Consumer
 	producer   bus.Producer
 	launchFunc LaunchFunc // for launching new workers
+	logger     *log.Logger
 
 	// communicating launcher has finished shutting down
 	doneCtx  context.Context    // launcher context (highest level context)
@@ -204,7 +258,8 @@ type Launcher struct {
 // The launcher assumes the producer and consumer
 // are fully initialized when the launcher is created.
 //
-// Will panic if not initialized with NewLauncher.
+// Will panic if not initialized with either NewLauncher
+// or NewCPLauncher.
 //
 // Calling DoTasks more than once is safe but
 // will not do anything. If called more than once will
@@ -221,6 +276,7 @@ func (l *Launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFu
 	go l.do()
 
 	l.isDoing = true
+
 	return l.doneCtx, l.stopCncl
 }
 
@@ -258,14 +314,17 @@ func (l *Launcher) do() {
 		// request another task
 		// if there is a slot available
 		case <-l.slots:
+			l.Add(1)
 			l.Lock()
-			if l.remaining > 0 {
-				l.remaining = l.remaining - 1
-			}
-			if l.remaining == 0 {
-				// the message about to be requested will
-				// be the last one.
-				l.lastCncl()
+			if l.remaining != 0 {
+				if l.remaining > 0 {
+					l.remaining = l.remaining - 1
+				}
+				if l.remaining == 0 {
+					// the message about to be requested will
+					// be the last one.
+					l.lastCncl()
+				}
 			}
 			l.Unlock()
 
@@ -283,7 +342,14 @@ func (l *Launcher) next() {
 		l.lastCncl()
 	}
 	if err != nil {
-		log.Println(err.Error())
+		l.log(err.Error())
+		l.giveBackSlot()
+
+		return
+	}
+
+	// handle a zero byte message
+	if len(tskB) == 0 {
 		l.giveBackSlot()
 
 		return
@@ -291,7 +357,7 @@ func (l *Launcher) next() {
 
 	tsk, err := NewFromBytes(tskB)
 	if err != nil {
-		log.Println(err.Error())
+		l.log(err.Error())
 		l.giveBackSlot()
 
 		return
@@ -307,8 +373,6 @@ func (l *Launcher) next() {
 // group and cleanly close down a worker
 // and report back on the task result.
 func (l *Launcher) doLaunch(tsk *Task) {
-	l.Add(1)
-	defer l.Done() // wg done
 	defer l.giveBackSlot()
 
 	var wCtx context.Context
@@ -318,8 +382,9 @@ func (l *Launcher) doLaunch(tsk *Task) {
 	} else {
 		wCtx, cncl = context.WithCancel(l.stopCtx)
 	}
-	defer cncl() // make sure to clean up worker context
+	defer cncl() // clean up worker context
 
+	// start task, after starting should always send back.
 	tsk.Start()
 	defer l.sendTsk(tsk)
 
@@ -363,7 +428,7 @@ func (l *Launcher) doLaunch(tsk *Task) {
 func (l *Launcher) sendTsk(tsk *Task) {
 	tskB, err := tsk.Bytes() // End() should already be called
 	if err != nil {
-		log.Println(err.Error())
+		l.log(err.Error())
 	} else {
 		l.producer.Send(l.conf.DoneTopic, tskB)
 	}
@@ -379,6 +444,12 @@ func (l *Launcher) giveBackSlot() {
 	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
 		l.slots <- 1
 	}
+	l.Done()
+}
+
+// log is the central point of operational logging.
+func (l *Launcher) log(msg string) {
+	l.logger.Println(msg)
 }
 
 // Err can be called after the launcher has
