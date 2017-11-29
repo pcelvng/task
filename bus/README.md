@@ -16,3 +16,12 @@ new task is requested. Remember that in batch processing the bottleneck is not f
 in the next task but rather completing the task itself. For high throughput tasks it is 
 recommended to use multiple instances of the worker.
 
+## Test Cases
+
+- Consumer messages are lazy loaded
+- Stop() can be called even when multiple calls are waiting for tasks
+- Stop() is non-blocking (even with outstanding Msg() or Send() requests)
+- Stop() is safe to call multiple times
+- Msg() is safe to call even after calling Stop()
+- Stop() is safe to call even if Msg() or Send() have not been called yet
+- Once consumer returns done=true then subsequent calls to Msg() should return done=true.

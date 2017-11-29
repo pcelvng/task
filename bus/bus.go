@@ -1,13 +1,17 @@
 package bus
 
 type Consumer interface {
-	Connect(topic, channel string) error
 	Msg() (msg []byte, done bool, err error)
-	Close() error
+	Stop() error
 }
 
 type Producer interface {
-	Connect() error
 	Send(topic string, msg []byte) error
-	Close() error
+	Stop() error
+}
+
+type Bus interface {
+	Msg() (msg []byte, done bool, err error)
+	Send(topic string, msg []byte) error
+	Stop() error
 }

@@ -2,6 +2,7 @@ package io
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -9,9 +10,17 @@ import (
 )
 
 func NewStdinConsumer() *Consumer {
-	return &Consumer{
+	// context for safe shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
+	c := &Consumer{
 		readCloser: os.Stdin,
+		ctx:        ctx,
+		cncl:       cncl,
 	}
+
+	c.connect()
+	return c
 }
 
 func NewFileConsumer(path string) (*Consumer, error) {
@@ -20,18 +29,32 @@ func NewFileConsumer(path string) (*Consumer, error) {
 		return nil, err
 	}
 
-	return &Consumer{
+	// context for safe shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
+	c := &Consumer{
 		readCloser: f,
-	}, nil
+		ctx:        ctx,
+		cncl:       cncl,
+	}
+
+	err = c.connect()
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 type Consumer struct {
 	sync.Mutex
 	readCloser io.ReadCloser
 	scanner    *bufio.Scanner
+	ctx        context.Context
+	cncl       context.CancelFunc
 }
 
-func (c *Consumer) Connect(_, _ string) error {
+func (c *Consumer) connect() error {
 	if c.scanner == nil {
 		c.scanner = bufio.NewScanner(c.readCloser)
 	}
@@ -40,12 +63,17 @@ func (c *Consumer) Connect(_, _ string) error {
 }
 
 func (c *Consumer) Msg() (msg []byte, done bool, err error) {
-	// Only one read from the file at a time
+	// Read one msg at a time
 	c.Lock()
 	defer c.Unlock()
+	if c.ctx.Err() != nil {
+		// should not attempt to read if already stopped
+		done = true
+		return msg, done, nil
+	}
 
 	if c.scanner == nil {
-		return msg, done, errors.New("consumer has not connected")
+		return msg, done, errors.New("consumer not connected")
 	}
 
 	if c.scanner.Scan() {
@@ -60,7 +88,12 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	return msg, done, err
 }
 
-func (c *Consumer) Close() error {
+func (c *Consumer) Stop() error {
+	if c.ctx.Err() != nil {
+		return nil
+	}
+	c.cncl()
+
 	if err := c.readCloser.Close(); err != nil {
 		return err
 	}

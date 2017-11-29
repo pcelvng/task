@@ -1,13 +1,14 @@
 package nsq
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
 	gonsq "github.com/bitly/go-nsq"
 )
 
-func NewLazyConsumer(c *Config) (*LazyConsumer, error) {
+func NewLazyConsumer(topic, channel string, c *Config) (*LazyConsumer, error) {
 	// initialized at 0 to pause reading on startup
 	maxInFlight := 0
 
@@ -15,11 +16,23 @@ func NewLazyConsumer(c *Config) (*LazyConsumer, error) {
 	nsqConf := gonsq.NewConfig()
 	nsqConf.MaxInFlight = maxInFlight
 
+	// create context for clean shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
+	// create lazy consumer
 	lc := &LazyConsumer{
 		conf:      c,
 		nsqConf:   nsqConf,
 		closeChan: make(chan interface{}),
 		msgChan:   make(chan []byte),
+		ctx:       ctx,
+		cncl:      cncl,
+	}
+
+	// connect to nsqd
+	err := lc.connect(topic, channel)
+	if err != nil {
+		return nil, err
 	}
 
 	return lc, nil
@@ -50,11 +63,15 @@ type LazyConsumer struct {
 
 	// mutex for updating consumer maxInFlight
 	sync.Mutex
+
+	// context for clean shutdown
+	ctx  context.Context
+	cncl context.CancelFunc
 }
 
 // connect will connect nsq. An error is returned if there
 // is a problem connecting.
-func (c *LazyConsumer) Connect(topic, channel string) error {
+func (c *LazyConsumer) connect(topic, channel string) error {
 	// initialize nsq consumer - does not connect
 	consumer, err := gonsq.NewConsumer(topic, channel, c.nsqConf)
 	if err != nil {
@@ -153,7 +170,7 @@ func (c *LazyConsumer) HandleMessage(msg *gonsq.Message) error {
 	// or else the calling application risks that the message
 	// reaches the timeout limit and is re-queued.
 	select {
-	case <-c.closeChan:
+	case <-c.ctx.Done():
 		// requeue so message is not lost during shutdown
 		msg.Requeue(-1)
 		return nil
@@ -167,21 +184,35 @@ func (c *LazyConsumer) HandleMessage(msg *gonsq.Message) error {
 
 // Msg will block until it receives one and only one message.
 //
-// Msg is safe to call concurrently.
+// Safe to call concurrently. Safe to call after Stop() and if this
+// is the case will simple return done=true.
 func (c *LazyConsumer) Msg() (msg []byte, done bool, err error) {
+	if c.ctx.Err() != nil {
+		// should not attempt to read if already stopped
+		done = true
+		return msg, done, nil
+	}
+
 	c.reqMsg() // request message
 
 	// wait for a message
-	msg = <-c.msgChan
+	select {
+	case msg = <-c.msgChan:
+		break
+	case <-c.ctx.Done():
+		done = true
+		break
+	}
 
 	return msg, done, err
 }
 
-// Close will close down all in-process activity
-// and the nsq consumer.
-func (c *LazyConsumer) Close() error {
-	// close out all work in progress
-	close(c.closeChan)
+func (c *LazyConsumer) Stop() error {
+	if c.ctx.Err() != nil {
+		return nil
+	}
+
+	c.cncl()
 
 	// stop the consumer
 	if c.consumer != nil {

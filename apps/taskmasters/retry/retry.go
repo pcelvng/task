@@ -8,23 +8,30 @@ import (
 
 	"github.com/pcelvng/task"
 	"github.com/pcelvng/task/bus"
-	"github.com/pcelvng/task/util"
 )
 
 func NewRetryer(conf *Config) (*Retryer, error) {
+	if len(conf.RetryRules) == 0 {
+		return nil, errors.New("no retry rules specified")
+	}
+
+	// map over done topic and channel for consumer
+	conf.BusConfig.Topic = conf.DoneTopic
+	conf.BusConfig.Channel = conf.DoneChannel
+
 	// make consumer
-	c, err := util.NewConsumer(conf.BusesConfig)
+	c, err := bus.NewConsumer(conf.BusConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// make producer
-	p, err := util.NewProducer(conf.BusesConfig)
+	p, err := bus.NewProducer(conf.BusConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Retryer{
+	r := &Retryer{
 		conf:       conf,
 		consumer:   c,
 		producer:   p,
@@ -32,7 +39,13 @@ func NewRetryer(conf *Config) (*Retryer, error) {
 		closeChan:  make(chan interface{}),
 		retryCache: make(map[string]int),
 		rulesMap:   make(map[string]*RetryRule),
-	}, nil
+	}
+
+	if err := r.start(); err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 type Retryer struct {
@@ -46,12 +59,12 @@ type Retryer struct {
 	sync.Mutex                // mutex for updating the retryCache
 }
 
-// Start will:
+// start will:
 // - load the retry rules
 // - connect the consumer
 // - connect the producer
 // - begin listening for error tasks
-func (r *Retryer) Start() error {
+func (r *Retryer) start() error {
 	if r.consumer == nil {
 		return errors.New("unable to start - no consumer")
 	}
@@ -60,45 +73,35 @@ func (r *Retryer) Start() error {
 		return errors.New("unable to start - no producer")
 	}
 
-	// start consumer
-	if err := r.consumer.Connect(r.conf.DoneTopic, r.conf.DoneChannel); err != nil {
-		return err
-	}
-
-	// start producer
-	if err := r.producer.Connect(); err != nil {
-		return err
-	}
-
 	// load rules into rules map
-	r.LoadRules()
+	r.loadRules()
 
 	// TODO: ability to load retry state from a file
 	// r.LoadRetries() // for now will log the retry state
 
 	// start listening for error tasks
-	r.Listen()
+	r.listen()
 
 	return nil
 }
 
-// LoadRules will load all the retry rules into
+// loadRules will load all the retry rules into
 // a local map for easier access.
-func (r *Retryer) LoadRules() {
+func (r *Retryer) loadRules() {
 	for _, rule := range r.rules {
 		key := rule.TaskType
 		r.rulesMap[key] = rule
 	}
 }
 
-// Listen will start the listen loop to listen
+// listen will start the listen loop to listen
 // for failed tasks and then handle those failed
 // tasks.
-func (r *Retryer) Listen() {
-	go r.listen()
+func (r *Retryer) listen() {
+	go r.doListen()
 }
 
-func (r *Retryer) listen() {
+func (r *Retryer) doListen() {
 	for {
 		// give the closeChan a change
 		// to break the loop.
@@ -156,7 +159,7 @@ func (r *Retryer) applyRule(tsk *task.Task) {
 	defer r.Unlock()
 	cnt, _ := r.retryCache[key]
 
-	if tsk.IsErr() {
+	if tsk.Result == task.ErrResult {
 		if cnt < rule.Retries {
 			r.retryCache[key] = cnt + 1
 			go r.doRetry(tsk, rule)
@@ -169,11 +172,11 @@ func (r *Retryer) applyRule(tsk *task.Task) {
 // doRetry will wait (if requested by the rule)
 // and then send the task to the outgoing channel
 func (r *Retryer) doRetry(tsk *task.Task, rule *RetryRule) {
-	time.Sleep(time.Minute * rule.Wait.Duration)
+	time.Sleep(rule.Wait.Duration)
 
 	// create a new task just like the old one
 	// and send it out.
-	nTsk := task.New(tsk.Type, tsk.Task)
+	nTsk := task.New(tsk.Type, tsk.Info)
 
 	topic := rule.TaskType
 	if rule.Topic != "" {
@@ -197,12 +200,12 @@ func (r *Retryer) Close() error {
 	close(r.closeChan)
 
 	// close the consumer
-	if err := r.consumer.Close(); err != nil {
+	if err := r.consumer.Stop(); err != nil {
 		return err
 	}
 
 	// close the producer
-	if err := r.producer.Close(); err != nil {
+	if err := r.producer.Stop(); err != nil {
 		return err
 	}
 
@@ -210,7 +213,7 @@ func (r *Retryer) Close() error {
 }
 
 // makeCacheKey will make a key string of the format:
-// "task.Type" + "task.Task"
+// "task.Type" + "task.Info"
 func makeCacheKey(tsk *task.Task) string {
-	return tsk.Type + tsk.Task
+	return tsk.Type + tsk.Info
 }

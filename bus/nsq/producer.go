@@ -1,7 +1,9 @@
 package nsq
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -9,12 +11,24 @@ import (
 	gonsq "github.com/bitly/go-nsq"
 )
 
-func NewProducer(c *Config) *Producer {
-	return &Producer{
+func NewProducer(c *Config) (*Producer, error) {
+	// context for clean shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
+	p := &Producer{
 		conf:     c,
 		nsqConf:  gonsq.NewConfig(),
 		numConns: 1,
+		ctx:      ctx,
+		cncl:     cncl,
 	}
+
+	// setup and test connection
+	if err := p.connect(); err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 type Producer struct {
@@ -28,11 +42,14 @@ type Producer struct {
 
 	// mutex for hostpool access
 	sync.Mutex
+
+	ctx  context.Context
+	cncl context.CancelFunc
 }
 
-// Connect will connect to all the nsqds
+// connect will connect to all the nsqds
 // specified in Config.
-func (p *Producer) Connect() error {
+func (p *Producer) connect() error {
 	// make the producers
 	producers := make(map[string]*gonsq.Producer)
 	for _, host := range p.conf.NSQdAddrs {
@@ -74,12 +91,18 @@ func (p *Producer) Connect() error {
 }
 
 func (p *Producer) Send(topic string, msg []byte) error {
+	p.Lock()
+	defer p.Unlock()
+
+	// should not attempt to send if producer already stopped.
+	if p.ctx.Err() != nil {
+		errMsg := fmt.Sprintf("unable to send '%v'; producer already stopped", string(msg))
+		return errors.New(errMsg)
+	}
+
 	if p.producers == nil || len(p.producers) == 0 {
 		return errors.New("no producers to send to")
 	}
-
-	r := p.hostPool.Get()
-	producer := p.producers[r.Host()]
 
 	if len(msg) == 0 {
 		return nil
@@ -89,12 +112,32 @@ func (p *Producer) Send(topic string, msg []byte) error {
 		return errors.New("no topic provided")
 	}
 
+	r := p.hostPool.Get()
+	producer := p.producers[r.Host()]
+
 	return producer.Publish(topic, msg)
 }
 
-func (p *Producer) Close() error {
+func (p *Producer) Stop() error {
+	if p.ctx.Err() != nil {
+		return nil
+	}
+	p.cncl()
+
 	if p.hostPool != nil {
 		p.hostPool.Close()
+	}
+
+	// close up all producers for in-flight produced messages
+	// Will tell all producers stop at once and then wait
+	// for them all to stop.
+	wg := sync.WaitGroup{}
+	for _, producer := range p.producers {
+		wg.Add(1)
+		go func() {
+			producer.Stop()
+			wg.Done()
+		}()
 	}
 
 	return nil

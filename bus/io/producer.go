@@ -2,15 +2,23 @@ package io
 
 import (
 	"bufio"
+	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
 )
 
 func NewStdoutProducer() *Producer {
+	// create context for clean shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
 	return &Producer{
 		writeCloser: os.Stdout,
 		writer:      bufio.NewWriter(os.Stdout),
+		ctx:         ctx,
+		cncl:        cncl,
 	}
 }
 
@@ -20,9 +28,14 @@ func NewFileProducer(path string) (*Producer, error) {
 		return nil, err
 	}
 
+	// create context for clean shutdown
+	ctx, cncl := context.WithCancel(context.Background())
+
 	return &Producer{
 		writeCloser: f,
 		writer:      bufio.NewWriter(f),
+		ctx:         ctx,
+		cncl:        cncl,
 	}, nil
 }
 
@@ -30,30 +43,40 @@ type Producer struct {
 	sync.Mutex
 	writeCloser io.WriteCloser
 	writer      *bufio.Writer
+	ctx         context.Context
+	cncl        context.CancelFunc
 }
 
-func (c *Producer) Connect() error {
-	return nil
-}
-
-func (c *Producer) Send(_ string, msg []byte) error {
+func (p *Producer) Send(_ string, msg []byte) error {
 	if (len(msg) == 0) || (msg[len(msg)-1] != '\n') {
 		msg = append(msg, '\n')
 	}
 
-	c.Lock()
-	defer c.Unlock()
-	_, err := c.writer.Write(msg)
+	p.Lock()
+	defer p.Unlock()
+
+	// should not attempt to send if already stopped.
+	if p.ctx.Err() != nil {
+		errMsg := fmt.Sprintf("unable to send '%v'; producer already stopped", string(msg))
+		return errors.New(errMsg)
+	}
+
+	_, err := p.writer.Write(msg)
 	if err != nil {
 		return err
 	}
-	c.writer.Flush()
+	p.writer.Flush()
 
 	return err
 }
 
-func (c *Producer) Close() error {
-	if err := c.writeCloser.Close(); err != nil {
+func (p *Producer) Stop() error {
+	if p.ctx.Err() != nil {
+		return nil
+	}
+	p.cncl()
+
+	if err := p.writeCloser.Close(); err != nil {
 		return err
 	}
 

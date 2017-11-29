@@ -6,8 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/pcelvng/task/launcher"
-	"github.com/pcelvng/task/receivers/flex"
+	"github.com/pcelvng/task"
 )
 
 func main() {
@@ -17,20 +16,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// create receiver
-	rcvr, err := flex.NewFlexReceiver(c.BusesConfig, c.Topic, c.Channel, c.DoneTopic)
-	if err != nil {
-		log.Println(err.Error())
-		os.Exit(1)
-	}
-
 	// create LauncherFunc
 	lFn := NewLauncherFunc(*c)
+
+	lConf := task.NewLauncherBusConfig()
+	l, err := task.NewLauncher(c, p, lFn, nil)
+	ctx, _ := l.DoTasks()
+	<-ctx.Done()
 
 	// create launcher
 	lConfig := launcher.NewConfig()
 	lConfig.MaxInFlight = *workers
-	l, err := launcher.New(rcvr, lFn, lConfig)
+	l, err := task.New(rcvr, lFn, lConfig)
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)

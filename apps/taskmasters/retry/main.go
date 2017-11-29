@@ -8,12 +8,12 @@ import (
 	"syscall"
 )
 
-var config = flag.String("config", "", "relative or absolute file path")
+var config = flag.String("config", "config.toml", "relative or absolute file path")
 
 func main() {
 	flag.Parse()
 	if *config == "" {
-		log.Println("'config' flag required")
+		log.Println("'config' flag value required")
 		os.Exit(1)
 	}
 
@@ -25,12 +25,6 @@ func main() {
 
 	// make retryer
 	rtryr, err := NewRetryer(conf)
-	if err != nil {
-		log.Println(err.Error())
-		os.Exit(1)
-	}
-
-	err = rtryr.Start()
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)

@@ -37,7 +37,7 @@ func main() {
 	select {
 	case <-closeChan:
 		// close the backloader
-		if err := bl.Close(); err != nil {
+		if err := bl.Stop(); err != nil {
 			log.Printf("err closing: '%v'\n", err.Error())
 			os.Exit(1)
 		}
