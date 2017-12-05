@@ -26,7 +26,7 @@ func main() {
 
 	// create launcher
 	lConfig := launcher.NewConfig()
-	lConfig.MaxInFlight = *workers
+	lConfig.MaxInProgress = *workers
 	l, err := task.New(rcvr, lFn, lConfig)
 	if err != nil {
 		log.Println(err.Error())

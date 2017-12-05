@@ -19,7 +19,7 @@ var (
 func NewLauncherConfig() *LauncherConfig {
 
 	return &LauncherConfig{
-		MaxInFlight: 1,
+		MaxInProgress: 1,
 		Timeout:     defaultTimeout,
 		LifetimeMax: 0, // not enabled by default
 		DoneTopic:   defaultDoneTopic,
@@ -38,9 +38,9 @@ func NewLauncherBusConfig(busType string) *LauncherBusConfig {
 }
 
 type LauncherConfig struct {
-	// MaxInFlight is the max number tasks
+	// MaxInProgress is the max number tasks
 	// in progress at one time.
-	MaxInFlight int
+	MaxInProgress int
 
 	// Timeout is how long the launcher will
 	// wait for a forced-shutdown worker to cleanup.
@@ -81,10 +81,10 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Laun
 		config = NewLauncherConfig()
 	}
 
-	// make sure maxInFlight is at least 1
-	maxInFlight := 1
-	if config.MaxInFlight > 1 {
-		maxInFlight = config.MaxInFlight
+	// make sure maxInProgress is at least 1
+	maxInProgress := 1
+	if config.MaxInProgress > 1 {
+		maxInProgress = config.MaxInProgress
 	}
 
 	// use default timeout if none provided.
@@ -93,9 +93,9 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Laun
 		timeout = config.Timeout
 	}
 
-	// create max in flight slots
-	slots := make(chan int, maxInFlight)
-	for i := maxInFlight; i > 0; i-- {
+	// create max in progress slots
+	slots := make(chan int, maxInProgress)
+	for i := maxInProgress; i > 0; i-- {
 		slots <- 1
 	}
 
@@ -142,7 +142,7 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Laun
 		stopCncl:      stopCncl,
 		lastCtx:       lastCtx,
 		lastCncl:      lastCncl,
-		maxInFlight:   maxInFlight,
+		maxInProgress:   maxInProgress,
 		slots:         slots,
 		closeTimeout:  timeout,
 	}
@@ -223,12 +223,12 @@ type Launcher struct {
 	// shutdown.
 	sync.WaitGroup
 
-	// maxInFlight describes the maximum number of tasks
+	// maxInProgress describes the maximum number of tasks
 	// that the launcher will allow at one
 	// time.
 	//
 	// Must have a value greater than zero.
-	maxInFlight int
+	maxInProgress int
 
 	// remaining is decremented every time a new task
 	// is requested. When remaining reaches 0 the task
