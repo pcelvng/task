@@ -31,4 +31,4 @@ apps/taskmasters/retry/config.toml
 apps/taskmasters/retry/*.json
 apps/taskmasters/backloader/*.json
 apps/workers/noop/*.json
-apps/workers/hello-world/tsk.json
+apps/workers/hello-world/done.json

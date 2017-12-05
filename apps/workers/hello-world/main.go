@@ -8,10 +8,7 @@ import (
 )
 
 func main() {
-	l, _ := task.NewLauncherWBus(
-		launchFunc,
-		task.NewLauncherBusConfig(""),
-	)
+	l, _ := task.NewLauncherWBus(launchFunc, nil)
 	ctx, _ := l.DoTasks()
 	<-ctx.Done()
 }

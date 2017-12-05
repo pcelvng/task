@@ -10,46 +10,35 @@ import (
 )
 
 func main() {
-	c := LoadConfig()
-	if err := c.Validate(); err != nil {
+	// signal handling - capture signal early.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+
+	// config
+	config = LoadConfig()
+	if err := config.Validate(); err != nil {
 		log.Println(err.Error())
 		os.Exit(1)
 	}
 
-	// create LauncherFunc
-	lFn := NewLauncherFunc(*c)
-
-	lConf := task.NewLauncherBusConfig()
-	l, err := task.NewLauncher(c, p, lFn, nil)
-	ctx, _ := l.DoTasks()
-	<-ctx.Done()
-
-	// create launcher
-	lConfig := launcher.NewConfig()
-	lConfig.MaxInProgress = *workers
-	l, err := task.New(rcvr, lFn, lConfig)
+	// launcher
+	l, err := task.NewLauncherWBus(MakeWorker, config.LauncherBusConfig)
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)
 	}
-
-	// signal handling, start and wait
-	closeChan := make(chan os.Signal)
-	signal.Notify(closeChan, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
-
-	closedChan, err := l.Start()
-	if err != nil {
-		log.Println(err.Error())
-		os.Exit(1)
-	}
-	l.Do()
+	done, cncl := l.DoTasks()
 
 	select {
-	case <-closeChan:
-		log.Println("shutting down...")
-		l.Close()
-	case <-closedChan: // l.Close called internally by the Launcher
-		break
+	case <-sigChan:
+		cncl()
+		<-done.Done()
+	case <-done.Done():
+	}
+
+	if err := l.Err(); err != nil {
+		log.Printf("err in shutdown: '%v'\n", err.Error())
+		os.Exit(1)
 	}
 	log.Println("done")
 }

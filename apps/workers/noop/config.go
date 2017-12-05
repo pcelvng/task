@@ -6,35 +6,37 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pcelvng/task/bus"
+	"github.com/pcelvng/task"
 )
 
 var (
-	tskType      = flag.String("type", "", "REQUIRED the task type; default topic")
-	msgBus       = flag.String("bus", "stdio", "'stdio', 'file', 'nsq'")
-	inBus        = flag.String("in-bus", "", "one of 'stdin', 'file', 'nsq'; useful if you want the in and out bus to be different types.")
-	outBus       = flag.String("out-bus", "", "one of 'stdout', 'file', 'nsq'; useful if you want the in and out bus to be different types.")
-	inFile       = flag.String("in-file", "./in.tsks.json", "file bus path and name when 'file' task-bus specified")
-	outFile      = flag.String("out-file", "./out.tsks.json", "file bus path and name when 'file' task-bus specified")
-	nsqdHosts    = flag.String("nsqd-hosts", "localhost:4150", "comma-separated list of nsqd hosts with tcp port")
-	lookupdHosts = flag.String("lookupd-hosts", "localhost:4161", "comma-separated list of lookupd hosts with http port")
-	topic        = flag.String("topic", "", "override task type as topic")
-	channel      = flag.String("channel", "", "override task type as channel")
-	doneTopic    = flag.String("done-topic", "done", "topic to return the task after completion")
-	failRate     = flag.Int("fail-rate", 0, "choose 0-100; the rate at which tasks will be marked with an error; does not support fractions of a percentage.")
-	dur          = flag.String("duration", "1s", "'1s' = 1 second, '1m' = 1 minute, '1h' = 1 hour")
-	durVariance  = flag.String("variance", "", "+ evenly distributed variation when a task completes; 1s = 1 second, 1m = 1 minute, 1h = 1 hour")
-	workers      = flag.Int("workers", 1, "maximum number of workers running at one time; workers cannot be less than 1.")
+	tskType            = flag.String("type", "", "REQUIRED the task type; default topic")
+	tskBus             = flag.String("bus", "stdio", "'stdio', 'file', 'nsq'")
+	inBus              = flag.String("in-bus", "", "one of 'stdin', 'file', 'nsq'; useful if you want the in and out bus to be different types.")
+	outBus             = flag.String("out-bus", "", "one of 'stdout', 'file', 'nsq'; useful if you want the in and out bus to be different types.")
+	inFile             = flag.String("in-file", "./in.tsks.json", "file bus path and name when 'file' task-bus specified")
+	outFile            = flag.String("out-file", "./out.tsks.json", "file bus path and name when 'file' task-bus specified")
+	nsqdHosts          = flag.String("nsqd-hosts", "localhost:4150", "comma-separated list of nsqd hosts with tcp port")
+	lookupdHosts       = flag.String("lookupd-hosts", "localhost:4161", "comma-separated list of lookupd hosts with http port")
+	topic              = flag.String("topic", "", "override task type as topic")
+	channel            = flag.String("channel", "", "override task type as channel")
+	doneTopic          = flag.String("done-topic", "done", "topic to return the task after completion")
+	failRate           = flag.Int("fail-rate", 0, "choose 0-100; the rate at which tasks will be marked with an error; does not support fractions of a percentage.")
+	dur                = flag.String("duration", "1s", "'1s' = 1 second, '1m' = 1 minute, '1h' = 1 hour")
+	durVariance        = flag.String("variance", "", "+ evenly distributed variation when a task completes; 1s = 1 second, 1m = 1 minute, 1h = 1 hour")
+	maxInProgress      = flag.Int("max-in-progress", 1, "maximum number of workers running at one time; workers cannot be less than 1.")
+	workerTimeout      = flag.Duration("worker-timeout", time.Second*10, "time to wait for a worker to finish when being asked to shut down.")
+	lifetimeMaxWorkers = flag.Int("lifetime-max-workers", 0, "maximum number of tasks that will be completed before the application will shut down. A value less than one sets no limit.")
 )
 
-func NewConfig() *Config {
-	return &Config{
-		BusConfig: bus.NewBusConfig(),
+func NewConfig() Config {
+	return Config{
+		LauncherBusConfig: task.NewLauncherBusConfig(""),
 	}
 }
 
 type Config struct {
-	*bus.BusConfig
+	*task.LauncherBusConfig
 
 	TaskType    string        // will be used as the default topic and channel
 	Topic       string        // topic override (uses 'TaskType' if not provided)
@@ -92,12 +94,12 @@ func (c *Config) DurVarianceString(dur string) error {
 	return nil
 }
 
-func LoadConfig() *Config {
+func LoadConfig() Config {
 	flag.Parse()
 
 	// load config
 	c := NewConfig()
-	c.Bus = *msgBus
+	c.Bus = *tskBus
 	c.InBus = *inBus
 	c.OutBus = *outBus
 	c.InFile = *inFile
@@ -116,6 +118,9 @@ func LoadConfig() *Config {
 	c.NsqdHostsString(*nsqdHosts)
 	c.DurString(*dur)
 	c.DurVarianceString(*durVariance)
+	c.MaxInProgress = *maxInProgress
+	c.WorkerTimeout = *workerTimeout
+	c.LifetimeMaxWorkers = *lifetimeMaxWorkers
 
 	return c
 }

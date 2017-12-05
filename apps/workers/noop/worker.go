@@ -1,75 +1,62 @@
 package main
 
 import (
+	"context"
 	"math/rand"
-	"sync"
 	"time"
 
 	"github.com/pcelvng/task"
 )
 
-func NewLauncherFunc(c Config) task.LaunchFunc {
-	lf := LauncherFunc{
-		conf: c,
-	}
+var config Config
 
-	return lf.LaunchFunc
-}
-
-type LauncherFunc struct {
-	conf Config
-}
-
-func (l *LauncherFunc) LaunchFunc(tsk *task.Task) task.Worker {
+func MakeWorker(info string) task.Worker {
 	return &NoopWorker{
-		config:  l.conf,
-		tsk:     tsk,
-		tskChan: make(chan *task.Task),
+		info: info,
 	}
 }
 
 type NoopWorker struct {
-	config  Config
-	tsk     *task.Task
-	tskChan chan *task.Task
-	isDoing bool
-	sync.Mutex
+	info string
 }
 
-func (w *NoopWorker) DoTask() chan *task.Task {
-	w.Lock()
-	defer w.Unlock()
+func (w *NoopWorker) DoTask(ctx context.Context) (result task.Result, msg string) {
+	doneChan := make(chan interface{})
+	go func() {
+		result, msg = w.doTask()
+		close(doneChan)
+	}()
 
-	if w.isDoing {
-		return w.tskChan
+	select {
+	case <-doneChan:
+	case <-ctx.Done():
+		result = task.ErrResult
+		msg = "task interrupted"
 	}
-	go w.doTask()
-	return w.tskChan
+
+	return result, msg
 }
 
-func (w *NoopWorker) doTask() {
+func (w *NoopWorker) doTask() (task.Result, string) {
 	// calc if failure
-	isFail := checkFail(w.config.FailRate)
+	isFail := checkFail(config.FailRate)
 
 	var dur time.Duration
 	if isFail { // calc failDuration
-		dur = failDuration(w.config.Dur, w.config.DurVariance)
+		dur = failDuration(config.Dur, config.DurVariance)
 	} else {
-		dur = successDuration(w.config.Dur, w.config.DurVariance)
+		dur = successDuration(config.Dur, config.DurVariance)
 	}
-	w.tsk.Start()
 
 	// wait for duration
 	time.Sleep(dur)
 
 	// complete task and return
 	if isFail {
-		w.tsk.Err("task failed")
+		return task.ErrResult, "failed to complete"
 	} else {
-		w.tsk.Complete("task successfull")
+		return task.CompleteResult, "completed successfully"
 	}
-
-	w.tskChan <- w.tsk
 }
 
 // successDuration will calculate how long the task
@@ -119,8 +106,4 @@ func checkFail(rate int) bool {
 	}
 
 	return false
-}
-
-func (w *NoopWorker) Close() error {
-	return nil
 }
