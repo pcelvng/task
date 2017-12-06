@@ -81,6 +81,9 @@ func successDuration(dur, durV time.Duration) time.Duration {
 // because it can fail at any time.
 func failDuration(dur, durV time.Duration) time.Duration {
 	maxDur := successDuration(dur, durV)
+	if maxDur == 0 {
+		return maxDur
+	}
 
 	// generate a random variance
 	seed := int64(time.Now().Nanosecond())
@@ -89,7 +92,7 @@ func failDuration(dur, durV time.Duration) time.Duration {
 	return time.Duration(v)
 }
 
-// isFail will return true if the task should
+// checkFail will return true if the task should
 // be completed as an error and false otherwise.
 // rate is assumed to be a value between 0-100.
 // A value of 100 or more will always return true and

@@ -285,33 +285,10 @@ func (l *Launcher) do() {
 
 	for {
 		select {
-
-		// either done case will close the do loop
-		// in the same way at the task loop level.
 		case <-l.stopCtx.Done():
+			goto Shutdown
 		case <-l.lastCtx.Done():
-			// close the consumer
-			if err := l.consumer.Stop(); err != nil {
-				l.mu.Lock()
-				l.closeErr = err
-				l.mu.Unlock()
-			}
-
-			// wait for workers to close up and send
-			// task responses.
-			l.wg.Wait()
-
-			// stop the producer
-			if err := l.producer.Stop(); err != nil {
-				l.mu.Lock()
-				l.closeErr = err
-				l.mu.Unlock()
-			}
-
-			return
-
-		// request another task
-		// if there is a slot available
+			goto Shutdown
 		case <-l.slots:
 			l.wg.Add(1)
 			l.mu.Lock()
@@ -331,6 +308,25 @@ func (l *Launcher) do() {
 			// the application can shut down when asked to.
 			go l.next()
 		}
+	}
+
+Shutdown:
+	// close the consumer
+	if err := l.consumer.Stop(); err != nil {
+		l.mu.Lock()
+		l.closeErr = err
+		l.mu.Unlock()
+	}
+
+	// wait for workers to close up and send
+	// task responses.
+	l.wg.Wait()
+
+	// stop the producer
+	if err := l.producer.Stop(); err != nil {
+		l.mu.Lock()
+		l.closeErr = err
+		l.mu.Unlock()
 	}
 }
 

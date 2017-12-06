@@ -8,12 +8,12 @@ import (
 )
 
 func main() {
-	l, _ := task.NewLauncherWBus(launchFunc, nil)
+	l, _ := task.NewLauncherWBus(MakeWorker, nil)
 	ctx, _ := l.DoTasks()
 	<-ctx.Done()
 }
 
-func launchFunc(info string, _ context.Context) task.Worker {
+func MakeWorker(info string) task.Worker {
 	return &HelloWorldWorker{info}
 }
 
@@ -21,7 +21,7 @@ type HelloWorldWorker struct {
 	info string
 }
 
-func (w *HelloWorldWorker) DoTask() (task.Result, string) {
+func (w *HelloWorldWorker) DoTask(_ context.Context) (task.Result, string) {
 	log.Println(w.info)
 	return task.CompleteResult, "task complete!"
 }
