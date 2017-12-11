@@ -307,7 +307,10 @@ func (l *Launcher) do() {
 			// next() needs to be non-blocking so
 			// the application can shut down when asked to.
 			go l.next()
+		default:
+			time.Sleep(time.Millisecond*10)
 		}
+
 	}
 
 Shutdown:
