@@ -12,19 +12,18 @@ import (
 )
 
 var (
-	defaultTimeout   = time.Second * 10
-	defaultDoneTopic = "done"
+	defaultWorkerTimeout = time.Second * 10
+	defaultDoneTopic     = "done"
 )
 
 func NewLauncherConfig() *LauncherConfig {
-
 	return &LauncherConfig{
-		MaxInFlight: 1,
-		Timeout:     defaultTimeout,
-		LifetimeMax: 0, // not enabled by default
-		DoneTopic:   defaultDoneTopic,
-		TaskType:    "",
-		Logger:      log.New(os.Stderr, "", log.LstdFlags),
+		MaxInProgress:      1,
+		WorkerTimeout:      defaultWorkerTimeout,
+		LifetimeMaxWorkers: 0, // not enabled by default
+		DoneTopic:          defaultDoneTopic,
+		TaskType:           "",
+		Logger:             log.New(os.Stderr, "", log.LstdFlags),
 	}
 }
 
@@ -38,17 +37,17 @@ func NewLauncherBusConfig(busType string) *LauncherBusConfig {
 }
 
 type LauncherConfig struct {
-	// MaxInFlight is the max number tasks
+	// MaxInProgress is the max number tasks
 	// in progress at one time.
-	MaxInFlight int
+	MaxInProgress int
 
-	// Timeout is how long the launcher will
+	// WorkerTimeout is how long the launcher will
 	// wait for a forced-shutdown worker to cleanup.
-	Timeout time.Duration
+	WorkerTimeout time.Duration
 
-	// LifetimeMax - maximum number of tasks the
+	// LifetimeMaxWorkers - maximum number of tasks the
 	// launcher will process before closing.
-	LifetimeMax int
+	LifetimeMaxWorkers int
 
 	// DoneTopic - topic to publish to for done tasks.
 	// Default: "done"
@@ -75,27 +74,27 @@ type LauncherBusConfig struct {
 
 // NewLauncher returns a Launcher from the provided
 // consumer and producer.
-func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *LauncherConfig) *Launcher {
+func NewLauncher(c bus.Consumer, p bus.Producer, mke MakeWorker, config *LauncherConfig) *Launcher {
 	// create config if none provided
 	if config == nil {
 		config = NewLauncherConfig()
 	}
 
-	// make sure maxInFlight is at least 1
-	maxInFlight := 1
-	if config.MaxInFlight > 1 {
-		maxInFlight = config.MaxInFlight
+	// make sure maxInProgress is at least 1
+	maxInProgress := 1
+	if config.MaxInProgress > 1 {
+		maxInProgress = config.MaxInProgress
 	}
 
 	// use default timeout if none provided.
-	timeout := defaultTimeout
-	if config.Timeout > 0 {
-		timeout = config.Timeout
+	workerTimeout := defaultWorkerTimeout
+	if config.WorkerTimeout > 0 {
+		workerTimeout = config.WorkerTimeout
 	}
 
-	// create max in flight slots
-	slots := make(chan int, maxInFlight)
-	for i := maxInFlight; i > 0; i-- {
+	// create max in progress slots
+	slots := make(chan int, maxInProgress)
+	for i := maxInProgress; i > 0; i-- {
 		slots <- 1
 	}
 
@@ -134,7 +133,7 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Laun
 		consumer:      c,
 		producer:      p,
 		conf:          config,
-		launchFunc:    lnchFn,
+		mke:           mke,
 		logger:        config.Logger,
 		doneCtx:       doneCtx,
 		doneCncl:      doneCncl,
@@ -142,9 +141,9 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Laun
 		stopCncl:      stopCncl,
 		lastCtx:       lastCtx,
 		lastCncl:      lastCncl,
-		maxInFlight:   maxInFlight,
+		maxInProgress: maxInProgress,
 		slots:         slots,
-		closeTimeout:  timeout,
+		closeTimeout:  workerTimeout,
 	}
 }
 
@@ -152,7 +151,7 @@ func NewLauncher(c bus.Consumer, p bus.Producer, lnchFn LaunchFunc, config *Laun
 // consumer and producer along with the launcher from a single config.
 // For added convenience, conf is optional and if not provided will
 // launch a consumer and producer with defaults.
-func NewLauncherWBus(lnchFn LaunchFunc, conf *LauncherBusConfig) (*Launcher, error) {
+func NewLauncherWBus(mke MakeWorker, conf *LauncherBusConfig) (*Launcher, error) {
 	if conf == nil {
 		conf = NewLauncherBusConfig("")
 	}
@@ -163,7 +162,7 @@ func NewLauncherWBus(lnchFn LaunchFunc, conf *LauncherBusConfig) (*Launcher, err
 		return nil, err
 	}
 
-	return NewLauncher(c, p, lnchFn, conf.LauncherConfig), nil
+	return NewLauncher(c, p, mke, conf.LauncherConfig), nil
 }
 
 // Launcher handles the heavy lifting of worker lifecycle, general
@@ -184,11 +183,11 @@ type Launcher struct {
 	// isDoing indicates the launcher has already launched the task loop
 	isDoing bool
 
-	conf       *LauncherConfig
-	consumer   bus.Consumer
-	producer   bus.Producer
-	launchFunc LaunchFunc // for launching new workers
-	logger     *log.Logger
+	conf     *LauncherConfig
+	consumer bus.Consumer
+	producer bus.Producer
+	mke      MakeWorker // for creating new workers
+	logger   *log.Logger
 
 	// communicating launcher has finished shutting down
 	doneCtx  context.Context    // launcher context (highest level context)
@@ -221,14 +220,14 @@ type Launcher struct {
 	// wg is the wait group for communicating
 	// when all tasks are complete or have been
 	// shutdown.
-	sync.WaitGroup
+	wg sync.WaitGroup
 
-	// maxInFlight describes the maximum number of tasks
+	// maxInProgress describes the maximum number of tasks
 	// that the launcher will allow at one
 	// time.
 	//
 	// Must have a value greater than zero.
-	maxInFlight int
+	maxInProgress int
 
 	// remaining is decremented every time a new task
 	// is requested. When remaining reaches 0 the task
@@ -248,8 +247,8 @@ type Launcher struct {
 	// closeErr is potentially set on shutdown
 	// if there was an err to communicate after
 	// shutdown is complete.
-	closeErr   error
-	sync.Mutex // managing safe access to closeErr
+	closeErr error
+	mu       sync.Mutex // managing safe access to closeErr
 }
 
 // DoTasks will start the task loop and immediately
@@ -286,36 +285,13 @@ func (l *Launcher) do() {
 
 	for {
 		select {
-
-		// either done case will close the do loop
-		// in the same way at the task loop level.
 		case <-l.stopCtx.Done():
+			goto Shutdown
 		case <-l.lastCtx.Done():
-			// close the consumer
-			if err := l.consumer.Stop(); err != nil {
-				l.Lock()
-				l.closeErr = err
-				l.Unlock()
-			}
-
-			// wait for workers to close up and send
-			// task responses.
-			l.Wait()
-
-			// stop the producer
-			if err := l.producer.Stop(); err != nil {
-				l.Lock()
-				l.closeErr = err
-				l.Unlock()
-			}
-
-			return
-
-		// request another task
-		// if there is a slot available
+			goto Shutdown
 		case <-l.slots:
-			l.Add(1)
-			l.Lock()
+			l.wg.Add(1)
+			l.mu.Lock()
 			if l.remaining != 0 {
 				if l.remaining > 0 {
 					l.remaining = l.remaining - 1
@@ -326,12 +302,31 @@ func (l *Launcher) do() {
 					l.lastCncl()
 				}
 			}
-			l.Unlock()
+			l.mu.Unlock()
 
 			// next() needs to be non-blocking so
 			// the application can shut down when asked to.
 			go l.next()
 		}
+	}
+
+Shutdown:
+	// close the consumer
+	if err := l.consumer.Stop(); err != nil {
+		l.mu.Lock()
+		l.closeErr = err
+		l.mu.Unlock()
+	}
+
+	// wait for workers to close up and send
+	// task responses.
+	l.wg.Wait()
+
+	// stop the producer
+	if err := l.producer.Stop(); err != nil {
+		l.mu.Lock()
+		l.closeErr = err
+		l.mu.Unlock()
 	}
 }
 
@@ -395,10 +390,10 @@ func (l *Launcher) doLaunch(tsk *Task) {
 		return
 	}
 
-	worker := l.launchFunc(tsk.Info, wCtx)
+	worker := l.mke(tsk.Info)
 	doneChan := make(chan interface{})
 	go func() {
-		result, msg := worker.DoTask()
+		result, msg := worker.DoTask(wCtx)
 		tsk.End(result, msg)
 		close(doneChan)
 	}()
@@ -444,7 +439,7 @@ func (l *Launcher) giveBackSlot() {
 	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
 		l.slots <- 1
 	}
-	l.Done()
+	l.wg.Done()
 }
 
 // log is the central point of operational logging.
@@ -459,8 +454,8 @@ func (l *Launcher) log(msg string) {
 // nil. Will return the same error on subsequent
 // calls.
 func (l *Launcher) Err() error {
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if l.doneCtx.Err() == nil {
 		return l.closeErr
 	}
