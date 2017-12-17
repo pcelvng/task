@@ -14,8 +14,8 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// clean up file
-	os.Remove(testFile)
-	os.Remove(testParallelFile)
+	//os.Remove(testFile)
+	//os.Remove(testParallelFile)
 
 	os.Exit(exitCode)
 }
@@ -24,11 +24,6 @@ func TestPkg(t *testing.T) {
 	// create producer
 	path := testFile
 	p, err := NewFileProducer(path)
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
-	}
-
-	err = p.Connect()
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -45,40 +40,24 @@ func TestPkg(t *testing.T) {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
 
-	err = p.Close()
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
-	}
-
 	// create consumer
 	c, err := NewFileConsumer(path)
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
 
-	// call msg before connect - should return error
-	_, done, err := c.Msg()
-	if err == nil {
-		t.Error("expected err but got nil")
-	}
-	if done {
-		t.Error("msg should not be marked done")
+	// msg - no error
+	msg1, done, err := c.Msg() // get first message
+	if err != nil {
+		t.Errorf("expected nil but got err: '%v'", err.Error())
 	}
 
-	err = c.Connect("", "")
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
+	expected := string(tmsg1)
+	if string(msg1) != expected {
+		t.Errorf("expected '%v' but got '%v'\n", expected, string(msg1))
 	}
 
-	msg1, done, err := c.Msg()
-	if err != nil {
-		t.Errorf("expected nil but got '%v'\n", err.Error())
-	} else {
-		expected := string(tmsg1)
-		if expected != string(msg1) {
-			t.Errorf("expected '%v' but got '%v'\n", expected, string(msg1))
-		}
-	}
+	// done - not done
 	if done {
 		t.Error("msg should not be marked done")
 	}
@@ -89,7 +68,7 @@ func TestPkg(t *testing.T) {
 	} else {
 		expected := string(tmsg2)
 		if expected != string(msg2) {
-			t.Errorf("expected '%v' but got '%v'\n", expected, string(msg2))
+			t.Errorf("expected '%v' but got '%v'\n", expected, string(msg1))
 		}
 	}
 	if done {
@@ -107,12 +86,6 @@ func TestPkg(t *testing.T) {
 	}
 	if !done {
 		t.Error("msg should be marked done")
-	}
-
-	// close consumer
-	err = c.Close()
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
 
 	// test if Msg() is called after closing
@@ -134,11 +107,6 @@ func TestParallel(t *testing.T) {
 	// create producer
 	path := testParallelFile
 	p, err := NewFileProducer(path)
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
-	}
-
-	err = p.Connect()
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -172,18 +140,8 @@ func TestParallel(t *testing.T) {
 		t.Errorf("got '%v' errs but expected '%v'", errCntGot, expected)
 	}
 
-	err = p.Close()
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
-	}
-
 	// create consumer
 	c, err := NewFileConsumer(path)
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
-	}
-
-	err = c.Connect("", "")
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -234,11 +192,5 @@ func TestParallel(t *testing.T) {
 	expected = 1
 	if int(doneCntGot) != expected {
 		t.Errorf("got '%v' done count but expected '%v'", doneCntGot, expected)
-	}
-
-	// close consumer
-	err = c.Close()
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
 }

@@ -10,33 +10,16 @@ import (
 
 func TestNewProducer(t *testing.T) {
 	conf := &Config{}
-	p := NewProducer(conf)
+	p, err := NewProducer(conf)
 
-	// test not nil
-	if p == nil {
-		t.Fatal("nsq producer should not be nil")
-	}
-
-	// test has conf
-	if p.conf == nil {
-		t.Error("nsq producer should have conf")
-	}
-
-	// test has nsqConf
-	if p.nsqConf == nil {
-		t.Error("nsq producer should have nsqConf")
-	}
-
-	// test has 1 conns
-	expected := 1
-	if p.numConns != expected {
-		t.Errorf("expected '%v' numConss but got '%v'", expected, p.numConns)
-	}
-
-	// test Connect with no hosts
-	err := p.Connect()
+	// err - not nil
 	if err == nil {
 		t.Error("expected err but got nil")
+	}
+
+	// producer - nil
+	if p != nil {
+		t.Error("producer should be nil")
 	}
 }
 
@@ -47,10 +30,16 @@ func TestProducer(t *testing.T) {
 		NSQdAddrs: []string{"localhost:4000"},
 		Logger:    logger, // turn off nsq logging
 	}
-	p := NewProducer(conf)
-	err := p.Connect()
+	p, err := NewProducer(conf)
+
+	// err - not nil
 	if err == nil {
 		t.Error("expected err but got nil")
+	}
+
+	// producer - nil
+	if p != nil {
+		t.Error("producer should be nil")
 	}
 
 	// connect with good address
@@ -58,31 +47,39 @@ func TestProducer(t *testing.T) {
 		NSQdAddrs: []string{"127.0.0.1:4150"},
 		Logger:    logger, // turn off nsq logging
 	}
-	p = NewProducer(conf)
+	p, err = NewProducer(conf)
+	if err != nil {
+		t.Errorf("expected nil but got err '%v'\n", err.Error())
+	}
 
-	// call send before connect to make sure it's safe
+	// send
 	err = p.Send("test-producer-topic", []byte("test message"))
+
+	// err - not nil
+	if err != nil {
+		t.Errorf("expected nil but got err '%v'\n", err.Error())
+	}
+
+	// stop
+	err = p.Stop()
+
+	// err - nil
+	if err != nil {
+		t.Errorf("expected nil but got err '%v'\n", err.Error())
+	}
+
+	// send
+	err = p.Send("test-producer-topic", []byte("test message"))
+
+	// err - not nil (producer already stopped)
 	if err == nil {
 		t.Error("expected err but got nil")
 	}
 
-	// call close before connect to make sure it's safe
-	err = p.Close()
-	if err != nil {
-		t.Errorf("expected nil but got err '%v'\n", err.Error())
-	}
+	// stop
+	err = p.Stop()
 
-	err = p.Connect()
-	if err != nil {
-		t.Errorf("expected nil but got err '%v'\n", err.Error())
-	}
-
-	err = p.Send("test-producer-topic", []byte("test message"))
-	if err != nil {
-		t.Errorf("expected nil but got err '%v'\n", err.Error())
-	}
-
-	err = p.Close()
+	// err - nil
 	if err != nil {
 		t.Errorf("expected nil but got err '%v'\n", err.Error())
 	}
@@ -92,14 +89,17 @@ func TestProducer(t *testing.T) {
 		NSQdAddrs: []string{"127.0.0.1:4150", "127.0.0.1:4150"},
 		Logger:    logger, // turn off nsq logging
 	}
-	p = NewProducer(conf)
+	p, err = NewProducer(conf)
 
-	err = p.Connect()
+	// err - nil
 	if err != nil {
 		t.Errorf("expected nil but got err '%v'\n", err.Error())
 	}
 
+	// send
 	err = p.Send("test-producer-topic", []byte("test message"))
+
+	// err - nil
 	if err != nil {
 		t.Errorf("expected nil but got err '%v'\n", err.Error())
 	}
@@ -109,18 +109,16 @@ func TestProducer(t *testing.T) {
 		NSQdAddrs: []string{"127.0.0.1:4150", "127.0.0.1:4000"},
 		Logger:    logger, // turn off nsq logging
 	}
-	p = NewProducer(conf)
 
 	// should return an err since one host is bad
-	err = p.Connect()
+	p, err = NewProducer(conf)
 	if err == nil {
 		t.Error("expected err but got nil")
 	}
 
-	// should return err since didn't connect correctly
-	err = p.Send("test-producer-topic", []byte("test message"))
-	if err == nil {
-		t.Error("expected err but got nil")
+	// p - nil
+	if p != nil {
+		t.Error("expected nil but got producer")
 	}
 }
 
@@ -133,14 +131,17 @@ func TestProducer_Race(t *testing.T) {
 		NSQdAddrs: []string{"127.0.0.1:4150", "127.0.0.1:4150"},
 		Logger:    logger, // turn off nsq logging
 	}
-	p := NewProducer(conf)
+	p, err := NewProducer(conf)
 
-	err := p.Connect()
+	// err - nil
 	if err != nil {
 		t.Errorf("expected nil but got err '%v'\n", err.Error())
 	}
 
+	// send
 	err = p.Send("test-producer-topic", []byte("test message"))
+
+	// err - nil
 	if err != nil {
 		t.Errorf("expected nil but got err '%v'\n", err.Error())
 	}
@@ -185,7 +186,7 @@ func TestProducer_Race(t *testing.T) {
 		}()
 	}
 
-	// close channel to release all the Msg() calls
+	// close channel to release all the Send() calls
 	close(releaseChan)
 
 	// wait for all messages to complete
@@ -194,5 +195,13 @@ func TestProducer_Race(t *testing.T) {
 	expected = 0
 	if int(errCntGot) != expected {
 		t.Errorf("got '%v' errs but expected '%v'", errCntGot, expected)
+	}
+
+	// stop
+	err = p.Stop()
+
+	// err - nil
+	if err != nil {
+		t.Errorf("expected nil but got err '%v'\n", err.Error())
 	}
 }

@@ -35,10 +35,9 @@ returns the results back to the task bus.
 
 ![Alt text](./assets/task-overview-simple.jpg "simple overview")
 
-### Quick Start: Hello World! Worker
+### Quick Start
 
-We already have a basic 'hello-world' worker created in 'apps/workers/hello-world'. Follow the
-README instructions from that directory to complete the tutorial. 
+For a quickstart tutorial navigate to the 'quickstart' directory and follow the README.md instructions.
 
 ## Tasks
 
@@ -175,16 +174,23 @@ Frequently there are several
 
 ## Make Your Own Worker
 
-Generally when we talk about workers we refer to a self contained 
-application that, when started, will listen to the task bus for tasks
-of a particular type. However, within a worker application are three
-components:
+If you haven't already, go make a simple worker, follow the worker 
+quickstart instructions found at './quickstart/worker/README.md'.
 
-- Worker (the part you make)
-- Receiver (receives tasks from the task bus and posts responses)
-- Launcher (manages the logistics of launching workers)
+Implementing a worker is easy. You just implement the worker interface,
+create a launcher and provide the launcher with an implemented 'MakeWorker'
+type. Both the worker interface and 'MakeWorker' type are found in the
+'worker.go' file.
 
-![Alt text](./assets/worker-anatomy.jpg "worker application anatomy")
+Do the following:
+
+- Implement Worker interface
+- Create a Launcher instance
+- Implement the 'MakeWorker' type
+
+While your worker application is running the launcher will listen for tasks
+on the configured task bus, launch a worker using the provided 'MakeWorker'
+function and cleanly shutdown the application.
 
 ### Worker Design Goals
 

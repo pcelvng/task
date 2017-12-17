@@ -11,13 +11,13 @@ $ go build
 Run the application and see the worker in action.
 
 ```bash
-$ cat tsk.json | ./hello-world > done.json 
+$ cat tsk.json | ./worker > done.json 
 ```
 
 The screen output should be very similar to:
 
 ```bash
-2017/01/01 00:00:05 hello world!
+2017/01/01 00:00:05 Hello World!
 ```
 
 That output represents what the worker *did*. In this case the worker
@@ -26,13 +26,13 @@ just logged the value of "info" from the task.
 Now look at the contents of 'done.json'. It should look very similar to:
 
 ```bash
-{"type":"hello-world","info":"hello world!","created":"2017-01-01T00:00:01Z","result":"complete","msg":"task complete!","started":"2017-01-01T00:00:05Z","ended":"2017-01-01T00:00:06Z"}
+{"type":"hello-world","info":"Hello World!","created":"2017-01-01T00:00:01Z","result":"complete","msg":"task complete!","started":"2017-01-01T00:00:05Z","ended":"2017-01-01T00:00:06Z"}
 ```
 
 Finally, look at the contents of 'tsk.json'
 
 ```bash
-{"type":"hello-world","info":"hello world!","created":"2017-01-01T00:00:01Z"}
+{"type":"hello-world","info":"Hello World!","created":"2017-01-01T00:00:01Z"}
 ```
 
 A task is a **signal** that tells a worker **to do something**. The 'info' contents tell 
