@@ -9,18 +9,13 @@ import (
 func TestStdoutProducer(t *testing.T) {
 	p := NewStdoutProducer()
 
-	err := p.Connect()
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'", err.Error())
-	}
-
 	// change the writer for testing
 	var b bytes.Buffer
 	p.writer = bufio.NewWriter(&b)
 
 	// send one test message
 	tmsg := []byte("test message")
-	err = p.Send("", tmsg)
+	err := p.Send("", tmsg)
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -49,10 +44,5 @@ func TestStdoutProducer(t *testing.T) {
 	expected = string("\n")
 	if expected != string(line) {
 		t.Errorf("expected '%v' but got '%v'\n", expected, string(line))
-	}
-
-	err = p.Close()
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
 }

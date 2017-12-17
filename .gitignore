@@ -15,21 +15,11 @@
 .idea/
 projectFilesBackup
 
-# binaries
-apps/taskmasters/backloader/backloader
-apps/taskmasters/cron/cron
-apps/taskmasters/http/http
-apps/taskmasters/responder/responder
-apps/taskmasters/retry/retry
-apps/workers/noop/noop
-apps/workers/hello-world/hello-world
-
-# development and usage debris
 bus/nsq/*.dat
-apps/taskmasters/cron/config.toml
-apps/taskmasters/cron/*.json
-apps/taskmasters/retry/config.toml
-apps/taskmasters/retry/*.json
-apps/taskmasters/backloader/*.json
-apps/workers/noop/*.json
-apps/workers/hello-world/done.json
+bus/nsq/test/*.dat
+bus/io/*.txt
+quickstart/worker/done.json
+quickstart/worker/worker
+quickstart/taskmaster/taskmaster
+quickstart/taskmaster/*.json
+quickstart/*.json

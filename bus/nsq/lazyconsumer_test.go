@@ -1,11 +1,9 @@
 package nsq
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +15,6 @@ import (
 	"time"
 
 	gonsq "github.com/bitly/go-nsq"
-	"github.com/pcelvng/task"
 )
 
 // TestMain will setup nsqd and lookupd. It expects those two binaries
@@ -71,34 +68,15 @@ func TestNewConsumer(t *testing.T) {
 	// LookupdAddrs: []string{"localhost:4160"},
 	}
 
-	lc, err := NewLazyConsumer(conf)
-	if err != nil {
-		t.Fatal(err)
+	lc, err := NewLazyConsumer("", "", conf)
+	if err == nil {
+		t.Fatal("err should not be nil")
 	}
 
-	// check consumer
-	if lc == nil {
-		t.Errorf("consumer should not be nil")
+	// consumer is nil
+	if lc != nil {
+		t.Error("consumer should be nil")
 	}
-
-	// check the nsq consumer is nil (not set until Connect
-	// is called)
-	if lc.consumer != nil {
-		t.Errorf("nsq consumer should be nil")
-	}
-
-	// check that nsqConf was set and that MaxInFlight == 0
-	expected := 0
-	if lc.nsqConf.MaxInFlight != expected {
-		t.Errorf("expected channel '%v' but got '%v'", expected, lc.nsqConf.MaxInFlight)
-	}
-
-	// check that consumer shuts down safely - even without
-	// having called Connect
-	if err := lc.Close(); err != nil {
-		t.Fatalf("bad shutdown: %v\n", err)
-	}
-
 }
 
 func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
@@ -112,25 +90,16 @@ func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 	topic := ""
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(conf)
-	if err != nil {
-		t.Fatal(err)
+	lc, err := NewLazyConsumer(topic, channel, conf)
+
+	// err is not nil - invalid topic name
+	if err == nil {
+		t.Fatal("expected err but got nil")
 	}
 
-	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(topic, channel); err == nil {
-		t.Errorf("expected nsqd error but got nil instead\n")
-	}
-
-	// check nsq consumer (should still be nil)
-	if lc.consumer != nil {
-		t.Errorf("nsq consumer should be nil\n")
-	}
-
-	// check that consumer shuts down safely - even without
-	// successfully connecting
-	if err := lc.Close(); err != nil {
-		t.Fatalf("bad shutdown: %v\n", err)
+	// consumer is nil
+	if lc != nil {
+		t.Error("consumer should be nil")
 	}
 }
 
@@ -138,32 +107,23 @@ func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		// Logger:       logger,
-		// NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
+	// Logger:       logger,
+	// NSQdAddrs: []string{"localhost:4150"},
+	// LookupdAddrs: []string{"localhost:4160"},
 	}
 	topic := "testtopic"
 	channel := ""
 
-	lc, err := NewLazyConsumer(conf)
-	if err != nil {
-		t.Fatal(err)
+	lc, err := NewLazyConsumer(topic, channel, conf)
+
+	// err is not nil - invalid channel name
+	if err == nil {
+		t.Fatal("expected err but got nil")
 	}
 
-	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(topic, channel); err == nil {
-		t.Errorf("expected nsqd invalid channel error but got nil instead\n")
-	}
-
-	// check nsq consumer (should still be nil)
-	if lc.consumer != nil {
-		t.Errorf("nsq consumer should be nil")
-	}
-
-	// check that consumer shuts down safely - even without
-	// successfully connecting
-	if err := lc.Close(); err != nil {
-		t.Fatalf("bad shutdown: %v\n", err)
+	// consumer is nil
+	if lc != nil {
+		t.Error("consumer should be nil")
 	}
 }
 
@@ -171,31 +131,32 @@ func TestLazyConsumer_Connect(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Logger:  logger,
+		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
 	}
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(conf)
+	lc, err := NewLazyConsumer(topic, channel, conf)
+
+	// err - nil
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("err should be nil got '%v' instead\n", err.Error())
 	}
 
-	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(topic, channel); err != nil {
-		t.Errorf("err '%v' when connecting to nsqd\n", err.Error())
+	// consumer - not nil
+	if lc == nil {
+		t.Fatal("consumer should not be nil")
 	}
 
-	// check nsq consumer (should still be nil)
+	// lc.consumer - not nil
 	if lc.consumer == nil {
-		t.Errorf("nsq consumer should not be nil")
+		t.Fatal("nsq consumer should not be nil")
 	}
 
-	// check that consumer shuts down safely - even without
-	// successfully connecting
-	if err := lc.Close(); err != nil {
+	// stop - no error
+	if err := lc.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
@@ -212,25 +173,16 @@ func TestLazyConsumer_ConnectNSQdsBad(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(conf)
-	if err != nil {
-		t.Fatal(err)
+	lc, err := NewLazyConsumer(topic, channel, conf)
+
+	// err - not nil
+	if err == nil {
+		t.Fatal("expected err but got nil")
 	}
 
-	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(topic, channel); err == nil {
-		t.Errorf("expected err but got nil\n")
-	}
-
-	// check nsq consumer (should still be nil)
-	if lc.consumer != nil {
-		t.Errorf("nsq consumer should be nil")
-	}
-
-	// check that consumer shuts down safely - even without
-	// successfully connecting
-	if err := lc.Close(); err != nil {
-		t.Fatalf("bad shutdown: %v\n", err)
+	// consumer - nil
+	if lc != nil {
+		t.Error("consumer should be nil")
 	}
 }
 
@@ -246,14 +198,9 @@ func TestLazyConsumer_ConnectNSQds(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(conf)
+	lc, err := NewLazyConsumer(topic, channel, conf)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// connect to local nsqd - should get invalid topic error
-	if err := lc.Connect(topic, channel); err != nil {
-		t.Errorf("expected nil but got err: '%v'\n", err.Error())
 	}
 
 	// check nsq consumer (should not be nil)
@@ -263,7 +210,7 @@ func TestLazyConsumer_ConnectNSQds(t *testing.T) {
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Close(); err != nil {
+	if err := lc.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
@@ -278,21 +225,16 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Logger:  logger,
+		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4000"}, // bad port
 	}
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(conf)
+	lc, err := NewLazyConsumer(topic, channel, conf)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// connect to local lookupd - should get error
-	if err := lc.Connect(topic, channel); err != nil {
-		t.Errorf("expected nil but got: '%v'\n", err.Error())
 	}
 
 	// check nsq consumer (should still be nil)
@@ -309,7 +251,7 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Close(); err != nil {
+	if err := lc.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
@@ -324,21 +266,16 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Logger:  logger,
+		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port
 	}
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(conf)
+	lc, err := NewLazyConsumer(topic, channel, conf)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// connect to local lookupd - should not get error
-	if err := lc.Connect(topic, channel); err != nil {
-		t.Errorf("expected nil but got: '%v'\n", err.Error())
 	}
 
 	// check nsq consumer (should not be nil)
@@ -355,7 +292,7 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Close(); err != nil {
+	if err := lc.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
@@ -374,7 +311,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Config{
-		Logger:  logger,
+		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port
 	}
@@ -384,14 +321,9 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	msgCnt := 1000
 	AddTasks(topic, msgCnt)
 
-	lc, err := NewLazyConsumer(conf)
+	lc, err := NewLazyConsumer(topic, channel, conf)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// connect to local lookupd - should not get error
-	if err := lc.Connect(topic, channel); err != nil {
-		t.Errorf("expected nil but got: '%v'\n", err.Error())
 	}
 
 	// check that there is a connection
@@ -573,7 +505,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Close(); err != nil {
+	if err := lc.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 
@@ -682,60 +614,12 @@ func AddTasks(topic string, tskCnt int) error {
 	producer.SetLogger(logger, gonsq.LogLevelInfo)
 
 	// create tasks and publish
-	body := make([]byte, 0)
+	body := []byte(`{"type":"test-task-type","info":"test-task"}`)
 	for i := 0; i < tskCnt; i++ {
-		tsk := task.New("test-task-type", "test-task")
-		body, err = tsk.Bytes()
 		if err = producer.Publish(topic, body); err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-func getNSQdStats(topic, channel string) (*NsqdStats, error) {
-	resp, err := http.Get("http://localhost:4151/stats?format=json")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-
-	// deserialize JSON
-	stats := &NsqdStats{}
-	if err := json.Unmarshal(body, stats); err != nil {
-		return nil, err
-	}
-
-	return stats, nil
-}
-
-type NsqdStats struct {
-	Version   string `json:"version"`
-	Health    string `json:"health"`
-	StartTime int    `json:"start_time"`
-	Topics    []struct {
-		TopicName            string        `json:"topic_name"`
-		Channels             []interface{} `json:"channels"`
-		Depth                int           `json:"depth"`
-		BackendDepth         int           `json:"backend_depth"`
-		MessageCount         int           `json:"message_count"`
-		Paused               bool          `json:"paused"`
-		E2EProcessingLatency struct {
-			Count       int         `json:"count"`
-			Percentiles interface{} `json:"percentiles"`
-		} `json:"e2e_processing_latency"`
-	} `json:"topics"`
-	Memory struct {
-		HeapObjects       int `json:"heap_objects"`
-		HeapIdleBytes     int `json:"heap_idle_bytes"`
-		HeapInUseBytes    int `json:"heap_in_use_bytes"`
-		HeapReleasedBytes int `json:"heap_released_bytes"`
-		GcPauseUsec100    int `json:"gc_pause_usec_100"`
-		GcPauseUsec99     int `json:"gc_pause_usec_99"`
-		GcPauseUsec95     int `json:"gc_pause_usec_95"`
-		NextGcBytes       int `json:"next_gc_bytes"`
-		GcTotalRuns       int `json:"gc_total_runs"`
-	} `json:"memory"`
 }
