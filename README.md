@@ -37,7 +37,8 @@ returns the results back to the task bus.
 
 ### Quick Start
 
-For a quickstart tutorial navigate to the 'quickstart' directory and follow the README.md instructions.
+For a quickstart tutorial navigate to the 'quickstart' directory and 
+follow the README.md instructions.
 
 ## Tasks
 
@@ -46,8 +47,8 @@ A task is just a simple JSON object like this one:
 ```json
 {
    "type":"task-type",
-   "task":"2017-01-01T01",
-   "created":"2017-10-28T15:42:07.8"
+   "info":"information for the worker",
+   "created":"2001-01-01T05:01:01.0Z"
 }
 ```
 
@@ -64,11 +65,12 @@ Example of a done task:
 ```json
 {
    "type":"task-type",
-   "task":"2017-01-01T01",
+   "info":"information for the worker",
+   "created":"2001-01-01T05:01:01.0Z",
    "result":"complete",
    "msg":"completed successfully!",
-   "started":"2017-10-28T15:42:07.1",
-   "completed":"2017-10-28T15:52:04.8"
+   "started":"2001-01-01T06:00:00.0Z",
+   "ended":"2001-01-01T20:00:00.0Z"
 }
 ```
 
@@ -77,11 +79,12 @@ Example of a done task with an error:
 ```json
 {
    "type":"task-type",
-   "task":"2017-01-01T01",
+   "info":"information for the worker",
+   "created":"2001-01-01T05:01:01.0Z",
    "result":"error",
    "msg":"error processing task!",
-   "started":"2017-10-28T15:42:07.1",
-   "completed":"2017-10-28T15:52:04.8"
+   "started":"2001-01-01T06:00:00.0Z",
+   "ended":"2001-01-01T20:00:00.0Z"
 }
 ```
 
