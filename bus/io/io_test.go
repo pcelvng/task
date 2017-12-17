@@ -14,8 +14,8 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// clean up file
-	//os.Remove(testFile)
-	//os.Remove(testParallelFile)
+	os.Remove(testFile)
+	os.Remove(testParallelFile)
 
 	os.Exit(exitCode)
 }
