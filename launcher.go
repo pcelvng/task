@@ -39,26 +39,26 @@ func NewLauncherBusConfig(busType string) *LauncherBusConfig {
 type LauncherConfig struct {
 	// MaxInProgress is the max number tasks
 	// in progress at one time.
-	MaxInProgress int
+	MaxInProgress int `toml:"max_in_progress"`
 
 	// WorkerTimeout is how long the launcher will
 	// wait for a forced-shutdown worker to cleanup.
-	WorkerTimeout time.Duration
+	WorkerTimeout time.Duration `toml:"worker_timeout"`
 
 	// LifetimeMaxWorkers - maximum number of tasks the
 	// launcher will process before closing.
-	LifetimeMaxWorkers int
+	LifetimeMaxWorkers int `toml:"lifetime_max_workers"`
 
 	// DoneTopic - topic to publish to for done tasks.
 	// Default: "done"
-	DoneTopic string
+	DoneTopic string `toml:"done_topic"`
 
 	// TaskType will check that the received task type
 	// matches TaskType and if not then will return the task
 	// with a task type mismatch error.
 	//
 	// If TaskType is empty then check will be skipped.
-	TaskType string
+	TaskType string `toml:"task_type"`
 
 	// custom logger option
 	Logger *log.Logger
