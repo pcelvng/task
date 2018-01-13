@@ -4,7 +4,6 @@ import (
 	"flag"
 
 	"github.com/pcelvng/task"
-	"github.com/pcelvng/task/bus"
 )
 
 var (
@@ -15,7 +14,7 @@ var (
 func main() {
 	flag.Parse()
 
-	tskJson, _ := task.New(*tskType, *tskInfo).Bytes()
-	tskBus, _ := bus.NewBus(bus.NewBusConfig(""))
+	tskJson, _ := task.New(*tskType, *tskInfo).JSONBytes()
+	tskBus, _ := task.NewBus(task.NewBusOpt(""))
 	tskBus.Send("", tskJson)
 }

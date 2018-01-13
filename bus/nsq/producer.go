@@ -11,12 +11,12 @@ import (
 	gonsq "github.com/bitly/go-nsq"
 )
 
-func NewProducer(c *Config) (*Producer, error) {
+func NewProducer(opt *Opt) (*Producer, error) {
 	// context for clean shutdown
 	ctx, cncl := context.WithCancel(context.Background())
 
 	p := &Producer{
-		conf:     c,
+		opt:      opt,
 		nsqConf:  gonsq.NewConfig(),
 		numConns: 1,
 		ctx:      ctx,
@@ -32,7 +32,7 @@ func NewProducer(c *Config) (*Producer, error) {
 }
 
 type Producer struct {
-	conf      *Config
+	opt       *Opt
 	nsqConf   *gonsq.Config
 	producers map[string]*gonsq.Producer
 	hostPool  hostpool.HostPool
@@ -52,7 +52,7 @@ type Producer struct {
 func (p *Producer) connect() error {
 	// make the producers
 	producers := make(map[string]*gonsq.Producer)
-	for _, host := range p.conf.NSQdAddrs {
+	for _, host := range p.opt.NSQdAddrs {
 		for i := 0; i < p.numConns; i++ {
 			producer, err := gonsq.NewProducer(host, p.nsqConf)
 			if err != nil {
@@ -60,8 +60,8 @@ func (p *Producer) connect() error {
 			}
 
 			// set custom logger
-			if p.conf.Logger != nil {
-				producer.SetLogger(p.conf.Logger, p.conf.LogLvl)
+			if p.opt.Logger != nil {
+				producer.SetLogger(p.opt.Logger, p.opt.LogLvl)
 			}
 
 			// check that producer has good host

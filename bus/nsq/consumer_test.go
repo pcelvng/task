@@ -62,27 +62,27 @@ var (
 func TestNewConsumer(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 	// Logger:       logger,
 	// NSQdAddrs: []string{"localhost:4150"},
 	// LookupdAddrs: []string{"localhost:4160"},
 	}
 
-	lc, err := NewLazyConsumer("", "", conf)
+	c, err := NewConsumer("", "", opt)
 	if err == nil {
 		t.Fatal("err should not be nil")
 	}
 
 	// consumer is nil
-	if lc != nil {
+	if c != nil {
 		t.Error("consumer should be nil")
 	}
 }
 
-func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
+func TestConsumer_ConnectNoTopic(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 	// Logger:       logger,
 	// NSQdAddrs: []string{"localhost:4150"},
 	// LookupdAddrs: []string{"localhost:4160"},
@@ -90,7 +90,7 @@ func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 	topic := ""
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 
 	// err is not nil - invalid topic name
 	if err == nil {
@@ -98,15 +98,15 @@ func TestLazyConsumer_ConnectNoTopic(t *testing.T) {
 	}
 
 	// consumer is nil
-	if lc != nil {
+	if c != nil {
 		t.Error("consumer should be nil")
 	}
 }
 
-func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
+func TestConsumer_ConnectNoChannel(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 	// Logger:       logger,
 	// NSQdAddrs: []string{"localhost:4150"},
 	// LookupdAddrs: []string{"localhost:4160"},
@@ -114,7 +114,7 @@ func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
 	topic := "testtopic"
 	channel := ""
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 
 	// err is not nil - invalid channel name
 	if err == nil {
@@ -122,15 +122,15 @@ func TestLazyConsumer_ConnectNoChannel(t *testing.T) {
 	}
 
 	// consumer is nil
-	if lc != nil {
+	if c != nil {
 		t.Error("consumer should be nil")
 	}
 }
 
-func TestLazyConsumer_Connect(t *testing.T) {
+func TestConsumer_Connect(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
@@ -138,7 +138,7 @@ func TestLazyConsumer_Connect(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 
 	// err - nil
 	if err != nil {
@@ -146,26 +146,26 @@ func TestLazyConsumer_Connect(t *testing.T) {
 	}
 
 	// consumer - not nil
-	if lc == nil {
+	if c == nil {
 		t.Fatal("consumer should not be nil")
 	}
 
-	// lc.consumer - not nil
-	if lc.consumer == nil {
+	// c.consumer - not nil
+	if c.consumer == nil {
 		t.Fatal("nsq consumer should not be nil")
 	}
 
 	// stop - no error
-	if err := lc.Stop(); err != nil {
+	if err := c.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
 
-func TestLazyConsumer_ConnectNSQdsBad(t *testing.T) {
+func TestConsumer_ConnectNSQdsBad(t *testing.T) {
 	// TEST BAD NSQD
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 		Logger:    logger,
 		NSQdAddrs: []string{"localhost:4000"},
 		// LookupdAddrs: []string{"localhost:4160"},
@@ -173,7 +173,7 @@ func TestLazyConsumer_ConnectNSQdsBad(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 
 	// err - not nil
 	if err == nil {
@@ -181,16 +181,16 @@ func TestLazyConsumer_ConnectNSQdsBad(t *testing.T) {
 	}
 
 	// consumer - nil
-	if lc != nil {
+	if c != nil {
 		t.Error("consumer should be nil")
 	}
 }
 
-func TestLazyConsumer_ConnectNSQds(t *testing.T) {
+func TestConsumer_ConnectNSQds(t *testing.T) {
 	// TEST GOOD NSQD
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 		Logger:    logger,
 		NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
@@ -198,24 +198,24 @@ func TestLazyConsumer_ConnectNSQds(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// check nsq consumer (should not be nil)
-	if lc.consumer == nil {
+	if c.consumer == nil {
 		t.Errorf("nsq consumer should not be nil")
 	}
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Stop(); err != nil {
+	if err := c.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
 
-func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
+func TestConsumer_ConnectLookupdsBad(t *testing.T) {
 	// TEST BAD LOOKUPD
 	// Note: nsq will not return an error if a connection to
 	// lookupd could not be made. It will instead keep trying
@@ -224,7 +224,7 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4000"}, // bad port
@@ -232,18 +232,18 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// check nsq consumer (should still be nil)
-	if lc.consumer == nil {
+	if c.consumer == nil {
 		t.Errorf("nsq consumer should not be nil")
 	}
 
 	// check that there are no connections (since it's not a valid port)
-	stats := lc.consumer.Stats()
+	stats := c.consumer.Stats()
 	expected := 0
 	if stats.Connections != expected {
 		t.Errorf("expected '%v' but got '%v'", expected, stats.Connections)
@@ -251,12 +251,12 @@ func TestLazyConsumer_ConnectLookupdsBad(t *testing.T) {
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Stop(); err != nil {
+	if err := c.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
 
-func TestLazyConsumer_ConnectLookupds(t *testing.T) {
+func TestConsumer_ConnectLookupds(t *testing.T) {
 	// TEST GOOD LOOKUPD
 	// Note: nsq will not return an error if a connection to
 	// lookupd could not be made. It will instead keep trying
@@ -265,7 +265,7 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port
@@ -273,18 +273,18 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// check nsq consumer (should not be nil)
-	if lc.consumer == nil {
+	if c.consumer == nil {
 		t.Errorf("nsq consumer should not be nil")
 	}
 
 	// check that there are no connections (since it's not a valid port)
-	stats := lc.consumer.Stats()
+	stats := c.consumer.Stats()
 	expected := 1
 	if stats.Connections != expected {
 		t.Errorf("expected '%v' but got '%v'", expected, stats.Connections)
@@ -292,12 +292,12 @@ func TestLazyConsumer_ConnectLookupds(t *testing.T) {
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Stop(); err != nil {
+	if err := c.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 }
 
-func TestLazyConsumer_Msg(t *testing.T) {
+func TestConsumer_Msg(t *testing.T) {
 	// TEST MSG
 	//
 	// - Should not load any messages upon connecting
@@ -310,7 +310,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Config{
+	opt := &Opt{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port
@@ -321,13 +321,13 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	msgCnt := 1000
 	AddTasks(topic, msgCnt)
 
-	lc, err := NewLazyConsumer(topic, channel, conf)
+	c, err := NewConsumer(topic, channel, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// check that there is a connection
-	stats := lc.consumer.Stats()
+	stats := c.consumer.Stats()
 	expected := 1
 	if stats.Connections != expected {
 		t.Errorf("expected '%v' but got '%v'", expected, stats.Connections)
@@ -352,7 +352,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	}
 
 	// get one message
-	b, _, err := lc.Msg()
+	b, _, err := c.Msg()
 	if err != nil {
 		t.Errorf("expected nil but got '%v'", err.Error())
 	}
@@ -366,7 +366,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	<-tckr.C
 
 	// check that there is a connection
-	stats = lc.consumer.Stats()
+	stats = c.consumer.Stats()
 
 	// no messages finished
 	expected = 1
@@ -394,7 +394,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	errCntGot := int64(0)
 	msgCntGot := int64(0)
 	for i := 0; i < serialMsgCnt; i++ {
-		b, _, err := lc.Msg()
+		b, _, err := c.Msg()
 		if err != nil {
 			atomic.AddInt64(&errCntGot, 1)
 		} else if len(b) > 0 {
@@ -417,7 +417,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	// check the consumer stats again
 	tckr = time.NewTicker(time.Millisecond * 5)
 	<-tckr.C
-	stats = lc.consumer.Stats()
+	stats = c.consumer.Stats()
 
 	// messages finished
 	expected = 1 + serialMsgCnt
@@ -453,7 +453,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 			defer wg.Done()
 			<-releaseChan
 
-			b, _, err := lc.Msg()
+			b, _, err := c.Msg()
 			if err != nil {
 				atomic.AddInt64(&errCntGot, 1)
 			} else if len(b) > 0 {
@@ -483,7 +483,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 	// check the consumer stats again
 	tckr = time.NewTicker(time.Millisecond * 5)
 	<-tckr.C
-	stats = lc.consumer.Stats()
+	stats = c.consumer.Stats()
 
 	// messages finished
 	expected = 1 + pMsgCnt + serialMsgCnt
@@ -505,7 +505,7 @@ func TestLazyConsumer_Msg(t *testing.T) {
 
 	// check that consumer shuts down safely - even without
 	// successfully connecting
-	if err := lc.Stop(); err != nil {
+	if err := c.Stop(); err != nil {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 

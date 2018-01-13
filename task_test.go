@@ -218,7 +218,7 @@ func TestTask_Bytes(t *testing.T) {
 	}
 
 	// should not have error
-	b, err := tsk.Bytes()
+	b, err := tsk.JSONBytes()
 	if err != nil {
 		t.Fatalf("task to bytes error: '%v'\n", err.Error())
 	}
@@ -284,7 +284,7 @@ func TestTask_Bytes(t *testing.T) {
 	tsk.Ended = tsStr
 
 	// no error
-	b, err = tsk.Bytes()
+	b, err = tsk.JSONBytes()
 	if err != nil {
 		t.Fatalf("task to bytes error: '%v'\n", err.Error())
 	}
@@ -345,7 +345,7 @@ func TestTask_String(t *testing.T) {
 		Info: "test-info",
 	}
 
-	tskStr, err := tsk.String()
+	tskStr, err := tsk.JSONString()
 	if err != nil {
 		t.Fatalf("task to string error: '%v'\n", err.Error())
 	}
