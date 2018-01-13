@@ -16,8 +16,37 @@ var (
 	defaultDoneTopic     = "done"
 )
 
-func NewLauncherConfig() *LauncherConfig {
-	return &LauncherConfig{
+// NewBusOpt is a convenience wrapper around
+// bus.NewBusOpt. This way the user won't need to import
+// another package for most use cases.
+func NewBusOpt(busType string) *bus.BusOpt {
+	return bus.NewBusOpt(busType)
+}
+
+// NewBus is a convenience wrapper around
+// bus.NewBus. This way the user won't need to import
+// another package for most use cases.
+func NewBus(conf *bus.BusOpt) (*bus.Bus, error) {
+	return bus.NewBus(conf)
+}
+
+// NewProducer is a convenience wrapper around
+// bus.NewProducer. This way the user won't need to import
+// another package for most use cases.
+func NewProducer(conf *bus.BusOpt) (bus.ProducerBus, error) {
+	return bus.NewProducer(conf)
+}
+
+// NewConsumer is a convenience wrapper around
+// bus.NewConsumer. This way the user won't need to import
+// another package for most use cases.
+func NewConsumer(conf *bus.BusOpt) (bus.ConsumerBus, error) {
+	return bus.NewConsumer(conf)
+}
+
+// NewLauncherOpt returns a new LauncherOpt.
+func NewLauncherOpt() *LauncherOpt {
+	return &LauncherOpt{
 		MaxInProgress:      1,
 		WorkerTimeout:      defaultWorkerTimeout,
 		LifetimeMaxWorkers: 0, // not enabled by default
@@ -27,16 +56,9 @@ func NewLauncherConfig() *LauncherConfig {
 	}
 }
 
-// NewLauncherBusConfig will create a new ConfigWBus; busType
-// is optional and if not provided will default to 'stdio'.
-func NewLauncherBusConfig(busType string) *LauncherBusConfig {
-	return &LauncherBusConfig{
-		BusConfig:      bus.NewBusConfig(busType),
-		LauncherConfig: NewLauncherConfig(),
-	}
-}
-
-type LauncherConfig struct {
+// LauncherOpt contains the options for initializing a
+// new launcher.
+type LauncherOpt struct {
 	// MaxInProgress is the max number tasks
 	// in progress at one time.
 	MaxInProgress int `toml:"max_in_progress"`
@@ -61,35 +83,52 @@ type LauncherConfig struct {
 	TaskType string `toml:"task_type"`
 
 	// custom logger option
-	Logger *log.Logger
+	Logger *log.Logger `toml:"-"`
 }
 
-// LauncherBusConfig is a convenience config for
-// initializing a launcher with a producer and consumer
-// from bus.BusConfig
-type LauncherBusConfig struct {
-	*bus.BusConfig
-	*LauncherConfig
+// NewLauncher creates a new launcher.
+func NewLauncher(mkr MakeWorker, opt *LauncherOpt, bOpt *bus.BusOpt) (*Launcher, error) {
+	if opt == nil {
+		opt = NewLauncherOpt()
+	}
+
+	if bOpt == nil {
+		bOpt = NewBusOpt("")
+	}
+
+	// consumer
+	c, err := NewConsumer(bOpt)
+	if err != nil {
+		return nil, err
+	}
+
+	// producer
+	p, err := NewProducer(bOpt)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewLauncherFromBus(mkr, c, p, opt), nil
 }
 
-// NewLauncher returns a Launcher from the provided
-// consumer and producer.
-func NewLauncher(c bus.Consumer, p bus.Producer, mke MakeWorker, config *LauncherConfig) *Launcher {
-	// create config if none provided
-	if config == nil {
-		config = NewLauncherConfig()
+// NewLauncherFromBus returns a Launcher from the provided
+// consumer and producer buses.
+func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, opt *LauncherOpt) *Launcher {
+	// launcher options
+	if opt == nil {
+		opt = NewLauncherOpt()
 	}
 
 	// make sure maxInProgress is at least 1
 	maxInProgress := 1
-	if config.MaxInProgress > 1 {
-		maxInProgress = config.MaxInProgress
+	if opt.MaxInProgress > 1 {
+		maxInProgress = opt.MaxInProgress
 	}
 
 	// use default timeout if none provided.
 	workerTimeout := defaultWorkerTimeout
-	if config.WorkerTimeout > 0 {
-		workerTimeout = config.WorkerTimeout
+	if opt.WorkerTimeout > 0 {
+		workerTimeout = opt.WorkerTimeout
 	}
 
 	// create max in progress slots
@@ -124,17 +163,17 @@ func NewLauncher(c bus.Consumer, p bus.Producer, mke MakeWorker, config *Launche
 	lastCtx, lastCncl := context.WithCancel(context.Background())
 
 	// make sure logger is not nil
-	if config.Logger == nil {
-		config.Logger = log.New(os.Stderr, "", log.LstdFlags)
+	if opt.Logger == nil {
+		opt.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
 	return &Launcher{
 		isInitialized: true,
 		consumer:      c,
 		producer:      p,
-		conf:          config,
+		opt:           opt,
 		mke:           mke,
-		logger:        config.Logger,
+		logger:        opt.Logger,
 		doneCtx:       doneCtx,
 		doneCncl:      doneCncl,
 		stopCtx:       stopCtx,
@@ -145,24 +184,6 @@ func NewLauncher(c bus.Consumer, p bus.Producer, mke MakeWorker, config *Launche
 		slots:         slots,
 		closeTimeout:  workerTimeout,
 	}
-}
-
-// NewLauncherWBus is a convenience initializer that will create a
-// consumer and producer along with the launcher from a single config.
-// For added convenience, conf is optional and if not provided will
-// launch a consumer and producer with defaults.
-func NewLauncherWBus(mke MakeWorker, conf *LauncherBusConfig) (*Launcher, error) {
-	if conf == nil {
-		conf = NewLauncherBusConfig("")
-	}
-
-	// create consumer and producer
-	c, p, err := bus.NewConsumerProducer(conf.BusConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewLauncher(c, p, mke, conf.LauncherConfig), nil
 }
 
 // Launcher handles the heavy lifting of worker lifecycle, general
@@ -183,9 +204,9 @@ type Launcher struct {
 	// isDoing indicates the launcher has already launched the task loop
 	isDoing bool
 
-	conf     *LauncherConfig
-	consumer bus.Consumer
-	producer bus.Producer
+	opt      *LauncherOpt
+	consumer bus.ConsumerBus
+	producer bus.ProducerBus
 	mke      MakeWorker // for creating new workers
 	logger   *log.Logger
 
@@ -384,8 +405,8 @@ func (l *Launcher) doLaunch(tsk *Task) {
 	defer l.sendTsk(tsk)
 
 	// check task type (if TaskType specified)
-	if l.conf.TaskType != "" && l.conf.TaskType != tsk.Type {
-		msg := fmt.Sprintf("wrong task type; expected '%v'", l.conf.TaskType)
+	if l.opt.TaskType != "" && l.opt.TaskType != tsk.Type {
+		msg := fmt.Sprintf("wrong task type; expected '%v'", l.opt.TaskType)
 		tsk.End(ErrResult, msg)
 		return
 	}
@@ -421,11 +442,11 @@ func (l *Launcher) doLaunch(tsk *Task) {
 }
 
 func (l *Launcher) sendTsk(tsk *Task) {
-	tskB, err := tsk.Bytes() // End() should already be called
+	tskB, err := tsk.JSONBytes() // End() should already be called
 	if err != nil {
 		l.log(err.Error())
 	} else {
-		l.producer.Send(l.conf.DoneTopic, tskB)
+		l.producer.Send(l.opt.DoneTopic, tskB)
 	}
 }
 
@@ -456,7 +477,7 @@ func (l *Launcher) log(msg string) {
 func (l *Launcher) Err() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.doneCtx.Err() == nil {
+	if l.doneCtx.Err() != nil {
 		return l.closeErr
 	}
 

@@ -15,12 +15,12 @@ var (
 	defaultNSQd      = []string{"localhost:4150"}
 )
 
-func NewBusConfig(bus string) *BusConfig {
+func NewBusOpt(bus string) *BusOpt {
 	if bus == "" {
 		bus = defaultBus
 	}
 
-	return &BusConfig{
+	return &BusOpt{
 		Bus:       bus,
 		InFile:    defaultReadPath,
 		OutFile:   defaultWritePath,
@@ -28,14 +28,10 @@ func NewBusConfig(bus string) *BusConfig {
 	}
 }
 
-// BusConfig is a general config struct that
+// BusOpt is a general config struct that
 // provides all potential config values for all
-// bus types and making it easy to configure the
-// consumer and producer as separate types.
-//
-// It can be used to easily and dynamically create
-// a producer and/or consumer.
-type BusConfig struct {
+// bus types.
+type BusOpt struct {
 	// Possible Values:
 	// - "stdio" (generic stdin, stdout)
 	// - "stdin" (for consumer)
@@ -55,59 +51,51 @@ type BusConfig struct {
 	LookupdHosts []string `toml:"lookupd_hosts"` // nsq consumer only
 
 	// consumer topic and channel
-	Topic   string // required for consumers
-	Channel string // required for consumers
+	Topic   string `toml:"topic"`   // required for consumers
+	Channel string `toml:"channel"` // required for consumers
 }
 
-// NewBus is a convenience method for making a DynamicBus that
-// implements the Bus interface.
-//
-// Convenience wrapper around NewDynamicBus using BusConfig.
-func NewBus(conf *BusConfig) (*DynamicBus, error) {
+// NewBus returns in instance of Bus.
+func NewBus(opt *BusOpt) (*Bus, error) {
 	// make consumer
-	c, err := NewConsumer(conf)
+	c, err := NewConsumer(opt)
 	if err != nil {
 		return nil, err
 	}
 
 	// make producer
-	p, err := NewProducer(conf)
+	p, err := NewProducer(opt)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewDynamicBus(c, p), nil
-}
-
-func NewDynamicBus(c Consumer, p Producer) *DynamicBus {
-	b := &DynamicBus{
+	return &Bus{
 		consumer: c,
 		producer: p,
-	}
-
-	return b
+	}, nil
 }
 
-// DynamicBus implements the Bus interface and can
-// be a convenient way to get all the features of a
-// producer and consumer in one.
+// Bus combines a consumer and producer into a single struct
+// and implements both the ConsumerBus and ProducerBus interfaces.
 //
-// DynamicBus is the same as getting a Consumer and Producer
+// Bus is the same as getting a Consumer and Producer
 // separately but having them available in a single object.
-type DynamicBus struct {
-	consumer Consumer
-	producer Producer
+//
+// Calling Stop() will stop the producer first then the consumer.
+type Bus struct {
+	consumer ConsumerBus
+	producer ProducerBus
 }
 
-func (b *DynamicBus) Msg() (msg []byte, done bool, err error) {
+func (b *Bus) Msg() (msg []byte, done bool, err error) {
 	return b.consumer.Msg()
 }
 
-func (b *DynamicBus) Send(topic string, msg []byte) error {
+func (b *Bus) Send(topic string, msg []byte) error {
 	return b.producer.Send(topic, msg)
 }
 
-func (b *DynamicBus) Stop() error {
+func (b *Bus) Stop() error {
 	cErr := b.consumer.Stop()
 	pErr := b.producer.Stop()
 
@@ -122,34 +110,15 @@ func (b *DynamicBus) Stop() error {
 	return nil
 }
 
-// NewConsumerProducer is a convenience method for making a consumer and producer
-// using the generic BusConfig.
-func NewConsumerProducer(conf *BusConfig) (Consumer, Producer, error) {
-	// make consumer
-	c, err := NewConsumer(conf)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// make producer
-	p, err := NewProducer(conf)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return c, p, nil
-}
-
-// NewProducer creates a bus producer from BusConfig.
-func NewProducer(conf *BusConfig) (Producer, error) {
-	var p Producer
+// NewProducer creates a bus producer from BusOpt.
+func NewProducer(opt *BusOpt) (ProducerBus, error) {
+	var p ProducerBus
 	var err error
-
 	// normalize bus value
-	busType := conf.Bus
-	if conf.OutBus != "" {
+	busType := opt.Bus
+	if opt.OutBus != "" {
 		// out bus value override
-		busType = conf.OutBus
+		busType = opt.OutBus
 	}
 
 	switch busType {
@@ -158,7 +127,7 @@ func NewProducer(conf *BusConfig) (Producer, error) {
 
 		break
 	case "file":
-		writePath := conf.OutFile
+		writePath := opt.OutFile
 		if writePath == "" {
 			writePath = defaultWritePath
 		}
@@ -167,13 +136,13 @@ func NewProducer(conf *BusConfig) (Producer, error) {
 
 		break
 	case "nsq":
-		nsqConf := &nsqbus.Config{}
-		if len(conf.NsqdHosts) == 0 {
-			nsqConf.NSQdAddrs = defaultNSQd
+		nsqOpt := &nsqbus.Opt{}
+		if len(opt.NsqdHosts) == 0 {
+			nsqOpt.NSQdAddrs = defaultNSQd
 		} else {
-			nsqConf.NSQdAddrs = conf.NsqdHosts
+			nsqOpt.NSQdAddrs = opt.NsqdHosts
 		}
-		p, err = nsqbus.NewProducer(nsqConf)
+		p, err = nsqbus.NewProducer(nsqOpt)
 
 		break
 	default:
@@ -195,15 +164,15 @@ func NewProducer(conf *BusConfig) (Producer, error) {
 }
 
 // NewConsumer creates a bus consumer from BusConfig.
-func NewConsumer(conf *BusConfig) (Consumer, error) {
-	var c Consumer
+func NewConsumer(opt *BusOpt) (ConsumerBus, error) {
+	var c ConsumerBus
 	var err error
 
 	// normalize bus value
-	busType := conf.Bus
-	if conf.InBus != "" {
+	busType := opt.Bus
+	if opt.InBus != "" {
 		// in bus value override
-		busType = conf.InBus
+		busType = opt.InBus
 	}
 
 	switch busType {
@@ -211,7 +180,7 @@ func NewConsumer(conf *BusConfig) (Consumer, error) {
 		c = iobus.NewStdinConsumer()
 		break
 	case "file":
-		readPath := conf.InFile
+		readPath := opt.InFile
 		if readPath == "" {
 			readPath = defaultReadPath
 		}
@@ -219,15 +188,15 @@ func NewConsumer(conf *BusConfig) (Consumer, error) {
 		c, err = iobus.NewFileConsumer(readPath)
 		break
 	case "nsq":
-		nsqConf := &nsqbus.Config{}
-		if len(conf.LookupdHosts) > 0 {
-			nsqConf.LookupdAddrs = conf.LookupdHosts
-		} else if len(conf.NsqdHosts) > 0 {
-			nsqConf.NSQdAddrs = conf.NsqdHosts
+		nsqOpt := &nsqbus.Opt{}
+		if len(opt.LookupdHosts) > 0 {
+			nsqOpt.LookupdAddrs = opt.LookupdHosts
+		} else if len(opt.NsqdHosts) > 0 {
+			nsqOpt.NSQdAddrs = opt.NsqdHosts
 		} else {
-			nsqConf.NSQdAddrs = defaultNSQd
+			nsqOpt.NSQdAddrs = defaultNSQd
 		}
-		c, err = nsqbus.NewLazyConsumer(conf.Topic, conf.Channel, nsqConf)
+		c, err = nsqbus.NewConsumer(opt.Topic, opt.Channel, nsqOpt)
 		break
 	default:
 		err = errors.New(fmt.Sprintf(

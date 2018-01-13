@@ -8,7 +8,7 @@ import (
 	gonsq "github.com/bitly/go-nsq"
 )
 
-func NewLazyConsumer(topic, channel string, c *Config) (*LazyConsumer, error) {
+func NewConsumer(topic, channel string, opt *Opt) (*Consumer, error) {
 	// initialized at 0 to pause reading on startup
 	maxInFlight := 0
 
@@ -20,8 +20,8 @@ func NewLazyConsumer(topic, channel string, c *Config) (*LazyConsumer, error) {
 	ctx, cncl := context.WithCancel(context.Background())
 
 	// create lazy consumer
-	lc := &LazyConsumer{
-		conf:      c,
+	c := &Consumer{
+		opt:       opt,
 		nsqConf:   nsqConf,
 		closeChan: make(chan interface{}),
 		msgChan:   make(chan []byte),
@@ -30,16 +30,16 @@ func NewLazyConsumer(topic, channel string, c *Config) (*LazyConsumer, error) {
 	}
 
 	// connect to nsqd
-	err := lc.connect(topic, channel)
+	err := c.connect(topic, channel)
 	if err != nil {
 		return nil, err
 	}
 
-	return lc, nil
+	return c, nil
 }
 
-type LazyConsumer struct {
-	conf     *Config
+type Consumer struct {
+	opt      *Opt
 	nsqConf  *gonsq.Config
 	consumer *gonsq.Consumer
 
@@ -71,7 +71,7 @@ type LazyConsumer struct {
 
 // connect will connect nsq. An error is returned if there
 // is a problem connecting.
-func (c *LazyConsumer) connect(topic, channel string) error {
+func (c *Consumer) connect(topic, channel string) error {
 	// initialize nsq consumer - does not connect
 	consumer, err := gonsq.NewConsumer(topic, channel, c.nsqConf)
 	if err != nil {
@@ -79,8 +79,8 @@ func (c *LazyConsumer) connect(topic, channel string) error {
 	}
 
 	// set custom logger
-	if c.conf.Logger != nil {
-		consumer.SetLogger(c.conf.Logger, c.conf.LogLvl)
+	if c.opt.Logger != nil {
+		consumer.SetLogger(c.opt.Logger, c.opt.LogLvl)
 	}
 
 	consumer.AddHandler(c)
@@ -88,13 +88,13 @@ func (c *LazyConsumer) connect(topic, channel string) error {
 	// attempt to connect to lookupds (if provided)
 	// or attempt to connect to nsqds (if provided)
 	// if neither is provided attempt to connect to localhost
-	if len(c.conf.LookupdAddrs) > 0 {
-		err = consumer.ConnectToNSQLookupds(c.conf.LookupdAddrs)
+	if len(c.opt.LookupdAddrs) > 0 {
+		err = consumer.ConnectToNSQLookupds(c.opt.LookupdAddrs)
 		if err != nil {
 			return err
 		}
-	} else if len(c.conf.NSQdAddrs) > 0 {
-		err = consumer.ConnectToNSQDs(c.conf.NSQdAddrs)
+	} else if len(c.opt.NSQdAddrs) > 0 {
+		err = consumer.ConnectToNSQDs(c.opt.NSQdAddrs)
 		if err != nil {
 			return err
 		}
@@ -113,7 +113,7 @@ func (c *LazyConsumer) connect(topic, channel string) error {
 
 // reqMsg will un-pause messages in flight (if paused)
 // (by setting maxInflight = 1)
-func (c *LazyConsumer) reqMsg() {
+func (c *Consumer) reqMsg() {
 	c.Lock()
 	// increase total message requested count
 	atomic.AddInt64(&c.msgRequested, 1)
@@ -131,7 +131,7 @@ func (c *LazyConsumer) reqMsg() {
 // message is received then 'true' is returned'. If the
 // message could not be received (b/c all requested messages
 // have been received) then 'false' is returned.
-func (c *LazyConsumer) recMsg() bool {
+func (c *Consumer) recMsg() bool {
 	c.Lock()
 	defer c.Unlock()
 
@@ -152,7 +152,7 @@ func (c *LazyConsumer) recMsg() bool {
 	return true // message was received
 }
 
-func (c *LazyConsumer) HandleMessage(msg *gonsq.Message) error {
+func (c *Consumer) HandleMessage(msg *gonsq.Message) error {
 	msg.DisableAutoResponse()
 	body := msg.Body
 
@@ -186,7 +186,7 @@ func (c *LazyConsumer) HandleMessage(msg *gonsq.Message) error {
 //
 // Safe to call concurrently. Safe to call after Stop() and if this
 // is the case will simple return done=true.
-func (c *LazyConsumer) Msg() (msg []byte, done bool, err error) {
+func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	if c.ctx.Err() != nil {
 		// should not attempt to read if already stopped
 		done = true
@@ -207,7 +207,7 @@ func (c *LazyConsumer) Msg() (msg []byte, done bool, err error) {
 	return msg, done, err
 }
 
-func (c *LazyConsumer) Stop() error {
+func (c *Consumer) Stop() error {
 	if c.ctx.Err() != nil {
 		return nil
 	}

@@ -6,9 +6,9 @@ import (
 	gonsq "github.com/bitly/go-nsq"
 )
 
-// Config is used for instantiating an NSQ Consumer or
+// Opt is used for instantiating an NSQ Consumer or
 // Producer. The Producer will ignore the Topic value.
-type Config struct {
+type Opt struct {
 	NSQdAddrs    []string // connects via TCP only
 	LookupdAddrs []string // connects via HTTP only
 
