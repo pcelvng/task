@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	iobus "github.com/pcelvng/task/bus/io"
+	"github.com/pcelvng/task/bus/nop"
 	nsqbus "github.com/pcelvng/task/bus/nsq"
 )
 
@@ -38,6 +39,7 @@ type BusOpt struct {
 	// - "stdout" (for producer)
 	// - "file"
 	// - "nsq"
+	// - "nop" - no-operation bus for testing
 	Bus    string `toml:"bus"`
 	InBus  string `toml:"in_bus"`
 	OutBus string `toml:"out_bus"`
@@ -49,6 +51,20 @@ type BusOpt struct {
 	// for "nsq" bus type
 	NsqdHosts    []string `toml:"nsqd_hosts"`    // nsq producer or consumer
 	LookupdHosts []string `toml:"lookupd_hosts"` // nsq consumer only
+
+	// NopMock for "nop" bus type,
+	// Can be set in order to
+	// mock various return scenarios.
+	//
+	// Supported Values:
+	// - "init_err" - returns err on initialization: either NewProducer or NewConsumer
+	// - "err" - every method returns an error
+	// - "send_err" - returns err when Producer.Send() is called.
+	// - "msg_err" - returns err on Consumer.Msg() call.
+	// - "msg_done" - returns a nil task message done=true on Consumer.Msg() call.
+	// - "msg_msg_done" - returns a non-nil task message and done=true Consumer.Msg() call.
+	// - "stop_err" - returns err on Stop() method call
+	NopMock string
 
 	// consumer topic and channel
 	Topic   string `toml:"topic"`   // required for consumers
@@ -124,8 +140,6 @@ func NewProducer(opt *BusOpt) (ProducerBus, error) {
 	switch busType {
 	case "stdout", "stdio", "":
 		p = iobus.NewStdoutProducer()
-
-		break
 	case "file":
 		writePath := opt.OutFile
 		if writePath == "" {
@@ -133,8 +147,6 @@ func NewProducer(opt *BusOpt) (ProducerBus, error) {
 		}
 
 		p, err = iobus.NewFileProducer(writePath)
-
-		break
 	case "nsq":
 		nsqOpt := &nsqbus.Opt{}
 		if len(opt.NsqdHosts) == 0 {
@@ -142,20 +154,20 @@ func NewProducer(opt *BusOpt) (ProducerBus, error) {
 		} else {
 			nsqOpt.NSQdAddrs = opt.NsqdHosts
 		}
-		p, err = nsqbus.NewProducer(nsqOpt)
 
-		break
+		p, err = nsqbus.NewProducer(nsqOpt)
+	case "nop":
+		p, err = nop.NewProducer(opt.NopMock)
 	default:
 		err = errors.New(fmt.Sprintf(
-			"task bus '%v' not supported - choices are 'stdio', 'stdout', 'file' or 'nsq'",
+			"task bus '%v' not supported",
 			busType,
 		))
-		break
 	}
 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf(
-			"err creating producer: '%v'\n",
+			"new producer: '%v'\n",
 			err.Error(),
 		))
 	}
@@ -178,7 +190,6 @@ func NewConsumer(opt *BusOpt) (ConsumerBus, error) {
 	switch busType {
 	case "stdin", "stdio", "":
 		c = iobus.NewStdinConsumer()
-		break
 	case "file":
 		readPath := opt.InFile
 		if readPath == "" {
@@ -186,7 +197,6 @@ func NewConsumer(opt *BusOpt) (ConsumerBus, error) {
 		}
 
 		c, err = iobus.NewFileConsumer(readPath)
-		break
 	case "nsq":
 		nsqOpt := &nsqbus.Opt{}
 		if len(opt.LookupdHosts) > 0 {
@@ -196,18 +206,20 @@ func NewConsumer(opt *BusOpt) (ConsumerBus, error) {
 		} else {
 			nsqOpt.NSQdAddrs = defaultNSQd
 		}
+
 		c, err = nsqbus.NewConsumer(opt.Topic, opt.Channel, nsqOpt)
-		break
+	case "nop":
+		c, err = nop.NewConsumer(opt.NopMock)
 	default:
 		err = errors.New(fmt.Sprintf(
-			"task bus '%v' not supported - choices are 'stdio', 'stdin', 'file' or 'nsq'",
+			"task bus '%v' not supported",
 			busType,
 		))
 	}
 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf(
-			"err creating consumer: '%v'\n",
+			"new consumer: '%v'\n",
 			err.Error(),
 		))
 	}
