@@ -108,7 +108,7 @@ func (t *Task) End(r Result, msg string) time.Time {
 		t.Result = r
 		t.Msg = msg
 		t.ended = time.Now()
-		t.Ended = t.started.Format(time.RFC3339)
+		t.Ended = t.ended.Format(time.RFC3339)
 	}
 
 	return t.ended
