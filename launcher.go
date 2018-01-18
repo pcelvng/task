@@ -87,7 +87,7 @@ type LauncherOpt struct {
 }
 
 // NewLauncher creates a new launcher.
-func NewLauncher(mkr MakeWorker, opt *LauncherOpt, bOpt *bus.BusOpt) (*Launcher, error) {
+func NewLauncher(worker Worker, opt *LauncherOpt, bOpt *bus.BusOpt) (*Launcher, error) {
 	if opt == nil {
 		opt = NewLauncherOpt()
 	}
@@ -108,12 +108,12 @@ func NewLauncher(mkr MakeWorker, opt *LauncherOpt, bOpt *bus.BusOpt) (*Launcher,
 		return nil, err
 	}
 
-	return NewLauncherFromBus(mkr, c, p, opt), nil
+	return NewLauncherFromBus(worker, c, p, opt), nil
 }
 
 // NewLauncherFromBus returns a Launcher from the provided
 // consumer and producer buses.
-func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, opt *LauncherOpt) *Launcher {
+func NewLauncherFromBus(worker Worker, c bus.ConsumerBus, p bus.ProducerBus, opt *LauncherOpt) *Launcher {
 	// launcher options
 	if opt == nil {
 		opt = NewLauncherOpt()
@@ -172,7 +172,7 @@ func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, op
 		consumer:      c,
 		producer:      p,
 		opt:           opt,
-		mke:           mke,
+		worker:        worker,
 		logger:        opt.Logger,
 		doneCtx:       doneCtx,
 		doneCncl:      doneCncl,
@@ -207,7 +207,7 @@ type Launcher struct {
 	opt      *LauncherOpt
 	consumer bus.ConsumerBus
 	producer bus.ProducerBus
-	mke      MakeWorker // for creating new workers
+	worker   Worker
 	logger   *log.Logger
 
 	// communicating launcher has finished shutting down
@@ -411,10 +411,9 @@ func (l *Launcher) doLaunch(tsk *Task) {
 		return
 	}
 
-	worker := l.mke(tsk.Info)
 	doneChan := make(chan interface{})
 	go func() {
-		result, msg := worker.DoTask(wCtx)
+		result, msg := l.worker.DoTask(wCtx, tsk.Info)
 		tsk.End(result, msg)
 		close(doneChan)
 	}()
