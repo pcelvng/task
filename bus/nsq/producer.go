@@ -11,7 +11,7 @@ import (
 	gonsq "github.com/bitly/go-nsq"
 )
 
-func NewProducer(opt *Opt) (*Producer, error) {
+func NewProducer(opt *Option) (*Producer, error) {
 	// context for clean shutdown
 	ctx, cncl := context.WithCancel(context.Background())
 
@@ -32,7 +32,7 @@ func NewProducer(opt *Opt) (*Producer, error) {
 }
 
 type Producer struct {
-	opt       *Opt
+	opt       *Option
 	nsqConf   *gonsq.Config
 	producers map[string]*gonsq.Producer
 	hostPool  hostpool.HostPool

@@ -34,14 +34,14 @@ func NewBus(conf *bus.Options) (*bus.Bus, error) {
 // NewProducer is a convenience wrapper around
 // bus.NewProducer. This way the user won't need to import
 // another package for most use cases.
-func NewProducer(conf *bus.Options) (bus.ProducerBus, error) {
+func NewProducer(conf *bus.Options) (bus.Producer, error) {
 	return bus.NewProducer(conf)
 }
 
 // NewConsumer is a convenience wrapper around
 // bus.NewConsumer. This way the user won't need to import
 // another package for most use cases.
-func NewConsumer(conf *bus.Options) (bus.ConsumerBus, error) {
+func NewConsumer(conf *bus.Options) (bus.Consumer, error) {
 	return bus.NewConsumer(conf)
 }
 
@@ -118,7 +118,8 @@ func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Laun
 //
 // Usually not necessary to use directly unless the caller
 // is providing a non-standard library consumer, producer buses.
-func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, opt *LauncherOptions) *Launcher {
+
+func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *Launcher {
 	// launcher options
 	if opt == nil {
 		opt = NewLauncherOptions()
@@ -217,8 +218,8 @@ type Launcher struct {
 	isDoing bool
 
 	opt      *LauncherOptions
-	consumer bus.ConsumerBus
-	producer bus.ProducerBus
+	consumer bus.Consumer
+	producer bus.Producer
 	mke      MakeWorker // for creating new workers
 	logger   *log.Logger
 

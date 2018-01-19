@@ -6,9 +6,9 @@ import (
 	gonsq "github.com/bitly/go-nsq"
 )
 
-// Opt is used for instantiating an NSQ Consumer or
+// Option is used for instantiating an NSQ Consumer or
 // Producer. The Producer will ignore the Topic value.
-type Opt struct {
+type Option struct {
 	NSQdAddrs    []string // connects via TCP only
 	LookupdAddrs []string // connects via HTTP only
 

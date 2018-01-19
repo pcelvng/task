@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewProducer(t *testing.T) {
-	conf := &Opt{}
+	conf := &Option{}
 	p, err := NewProducer(conf)
 
 	// err - not nil
@@ -26,7 +26,7 @@ func TestNewProducer(t *testing.T) {
 func TestProducer(t *testing.T) {
 	// connect with bad address
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Opt{
+	conf := &Option{
 		NSQdAddrs: []string{"localhost:4000"},
 		Logger:    logger, // turn off nsq logging
 	}
@@ -43,7 +43,7 @@ func TestProducer(t *testing.T) {
 	}
 
 	// connect with good address
-	conf = &Opt{
+	conf = &Option{
 		NSQdAddrs: []string{"127.0.0.1:4150"},
 		Logger:    logger, // turn off nsq logging
 	}
@@ -85,7 +85,7 @@ func TestProducer(t *testing.T) {
 	}
 
 	// connect to multiple good nsqds
-	conf = &Opt{
+	conf = &Option{
 		NSQdAddrs: []string{"127.0.0.1:4150", "127.0.0.1:4150"},
 		Logger:    logger, // turn off nsq logging
 	}
@@ -105,7 +105,7 @@ func TestProducer(t *testing.T) {
 	}
 
 	// connect to multiple good nsqds - one good one bad
-	conf = &Opt{
+	conf = &Option{
 		NSQdAddrs: []string{"127.0.0.1:4150", "127.0.0.1:4000"},
 		Logger:    logger, // turn off nsq logging
 	}
@@ -127,7 +127,7 @@ func TestProducer_Race(t *testing.T) {
 	topic := "test-producer-topic"
 	msg := []byte("test message")
 	logger := log.New(ioutil.Discard, "", 0)
-	conf := &Opt{
+	conf := &Option{
 		NSQdAddrs: []string{"127.0.0.1:4150", "127.0.0.1:4150"},
 		Logger:    logger, // turn off nsq logging
 	}
