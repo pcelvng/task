@@ -16,12 +16,12 @@ var (
 	defaultNSQd      = []string{"localhost:4150"}
 )
 
-func NewBusOpt(bus string) *BusOpt {
+func NewOptions(bus string) *Options {
 	if bus == "" {
 		bus = defaultBus
 	}
 
-	return &BusOpt{
+	return &Options{
 		Bus:       bus,
 		InFile:    defaultReadPath,
 		OutFile:   defaultWritePath,
@@ -29,10 +29,10 @@ func NewBusOpt(bus string) *BusOpt {
 	}
 }
 
-// BusOpt is a general config struct that
+// Options is a general config struct that
 // provides all potential config values for all
 // bus types.
-type BusOpt struct {
+type Options struct {
 	// Possible Values:
 	// - "stdio" (generic stdin, stdout)
 	// - "stdin" (for consumer)
@@ -72,7 +72,7 @@ type BusOpt struct {
 }
 
 // NewBus returns in instance of Bus.
-func NewBus(opt *BusOpt) (*Bus, error) {
+func NewBus(opt *Options) (*Bus, error) {
 	// make consumer
 	c, err := NewConsumer(opt)
 	if err != nil {
@@ -126,8 +126,8 @@ func (b *Bus) Stop() error {
 	return nil
 }
 
-// NewProducer creates a bus producer from BusOpt.
-func NewProducer(opt *BusOpt) (ProducerBus, error) {
+// NewProducer creates a bus producer from Options.
+func NewProducer(opt *Options) (ProducerBus, error) {
 	var p ProducerBus
 	var err error
 	// normalize bus value
@@ -176,7 +176,7 @@ func NewProducer(opt *BusOpt) (ProducerBus, error) {
 }
 
 // NewConsumer creates a bus consumer from BusConfig.
-func NewConsumer(opt *BusOpt) (ConsumerBus, error) {
+func NewConsumer(opt *Options) (ConsumerBus, error) {
 	var c ConsumerBus
 	var err error
 
