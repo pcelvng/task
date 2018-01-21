@@ -123,6 +123,9 @@ func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, op
 	if opt == nil {
 		opt = NewLauncherOptions()
 	}
+	if opt.DoneTopic == "" {
+		opt.DoneTopic = defaultDoneTopic
+	}
 
 	// make sure maxInProgress is at least 1
 	maxInProgress := uint(1)

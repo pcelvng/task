@@ -25,7 +25,7 @@ func NewOptions(bus string) *Options {
 		Bus:       bus,
 		InFile:    defaultReadPath,
 		OutFile:   defaultWritePath,
-		NsqdHosts: defaultNSQd,
+		NSQdHosts: defaultNSQd,
 	}
 }
 
@@ -49,7 +49,7 @@ type Options struct {
 	OutFile string `toml:"out_file"` // file consumer
 
 	// for "nsq" bus type
-	NsqdHosts    []string `toml:"nsqd_hosts"`    // nsq producer or consumer
+	NSQdHosts    []string `toml:"nsqd_hosts"`    // nsq producer or consumer
 	LookupdHosts []string `toml:"lookupd_hosts"` // nsq consumer only
 
 	// NopMock for "nop" bus type,
@@ -149,10 +149,10 @@ func NewProducer(opt *Options) (ProducerBus, error) {
 		p, err = iobus.NewFileProducer(writePath)
 	case "nsq":
 		nsqOpt := &nsqbus.Opt{}
-		if len(opt.NsqdHosts) == 0 {
+		if len(opt.NSQdHosts) == 0 {
 			nsqOpt.NSQdAddrs = defaultNSQd
 		} else {
-			nsqOpt.NSQdAddrs = opt.NsqdHosts
+			nsqOpt.NSQdAddrs = opt.NSQdHosts
 		}
 
 		p, err = nsqbus.NewProducer(nsqOpt)
@@ -201,8 +201,8 @@ func NewConsumer(opt *Options) (ConsumerBus, error) {
 		nsqOpt := &nsqbus.Opt{}
 		if len(opt.LookupdHosts) > 0 {
 			nsqOpt.LookupdAddrs = opt.LookupdHosts
-		} else if len(opt.NsqdHosts) > 0 {
-			nsqOpt.NSQdAddrs = opt.NsqdHosts
+		} else if len(opt.NSQdHosts) > 0 {
+			nsqOpt.NSQdAddrs = opt.NSQdHosts
 		} else {
 			nsqOpt.NSQdAddrs = defaultNSQd
 		}
