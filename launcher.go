@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	defaultWorkerTimeout = time.Second * 10
-	defaultDoneTopic     = "done"
+	defaultWorkerTimeout      = time.Second * 10
+	defaultDoneTopic          = "done"
+	defaultMaxInProgress uint = 1
 )
 
 // NewBusOptions is a convenience wrapper around
@@ -47,12 +48,11 @@ func NewConsumer(conf *bus.Options) (bus.ConsumerBus, error) {
 // NewLauncherOptions returns a new LauncherOptions.
 func NewLauncherOptions() *LauncherOptions {
 	return &LauncherOptions{
-		MaxInProgress:      1,
-		WorkerTimeout:      defaultWorkerTimeout,
-		LifetimeMaxWorkers: 0, // not enabled by default
-		DoneTopic:          defaultDoneTopic,
-		TaskType:           "",
-		Logger:             log.New(os.Stderr, "", log.LstdFlags),
+		MaxInProgress: defaultMaxInProgress,
+		WorkerTimeout: defaultWorkerTimeout,
+		DoneTopic:     defaultDoneTopic,
+		TaskType:      "",
+		Logger:        log.New(os.Stderr, "", log.LstdFlags),
 	}
 }
 
@@ -61,7 +61,7 @@ func NewLauncherOptions() *LauncherOptions {
 type LauncherOptions struct {
 	// MaxInProgress is the max number tasks
 	// in progress at one time.
-	MaxInProgress int `toml:"max_in_progress"`
+	MaxInProgress uint `toml:"max_in_progress"`
 
 	// WorkerTimeout is how long the launcher will
 	// wait for a forced-shutdown worker to cleanup.
@@ -69,7 +69,9 @@ type LauncherOptions struct {
 
 	// LifetimeMaxWorkers - maximum number of tasks the
 	// launcher will process before closing.
-	LifetimeMaxWorkers int `toml:"lifetime_max_workers"`
+	//
+	// The default value of 0 means there is no limit.
+	LifetimeMaxWorkers uint `toml:"lifetime_max_workers"`
 
 	// DoneTopic - topic to publish to for done tasks.
 	// Default: "done"
@@ -113,6 +115,9 @@ func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Laun
 
 // NewLauncherFromBus returns a Launcher from the provided
 // consumer and producer buses.
+//
+// Usually not necessary to use directly unless the caller
+// is providing a non-standard library consumer, producer buses.
 func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, opt *LauncherOptions) *Launcher {
 	// launcher options
 	if opt == nil {
@@ -120,7 +125,7 @@ func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, op
 	}
 
 	// make sure maxInProgress is at least 1
-	maxInProgress := 1
+	maxInProgress := uint(1)
 	if opt.MaxInProgress > 1 {
 		maxInProgress = opt.MaxInProgress
 	}
@@ -136,6 +141,9 @@ func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, op
 	for i := maxInProgress; i > 0; i-- {
 		slots <- 1
 	}
+
+	// lifetime max remaining (0; no lifetime max)
+	remaining := opt.LifetimeMaxWorkers
 
 	// doneCncl (done cancel function)
 	// - is called internally by the launcher to signal that the launcher
@@ -181,6 +189,7 @@ func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, op
 		lastCtx:       lastCtx,
 		lastCncl:      lastCncl,
 		maxInProgress: maxInProgress,
+		remaining:     remaining,
 		slots:         slots,
 		closeTimeout:  workerTimeout,
 	}
@@ -247,17 +256,17 @@ type Launcher struct {
 	// that the launcher will allow at one
 	// time.
 	//
-	// Must have a value greater than zero.
-	maxInProgress int
+	// A value of 0 is set to 1. Will always have a value of at
+	// least 1.
+	maxInProgress uint
 
 	// remaining is decremented every time a new task
 	// is requested. When remaining reaches 0 the task
 	// requested is marked as the last and when it finishes
 	// the launcher will shutdown.
 	//
-	// If remaining is not set or set to a negative number
-	// then the launcher will not use a lifetime limit.
-	remaining int
+	// An initial value of 0 means there is no lifetime limit.
+	remaining uint
 
 	// slots describes the number of slots
 	// available. Each slot represents a
@@ -296,7 +305,6 @@ func (l *Launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFu
 	go l.do()
 
 	l.isDoing = true
-
 	return l.doneCtx, l.stopCncl
 }
 
