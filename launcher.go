@@ -16,37 +16,37 @@ var (
 	defaultDoneTopic     = "done"
 )
 
-// NewBusOpt is a convenience wrapper around
-// bus.NewBusOpt. This way the user won't need to import
+// NewBusOptions is a convenience wrapper around
+// bus.NewBusOptions. This way the user won't need to import
 // another package for most use cases.
-func NewBusOpt(busType string) *bus.BusOpt {
-	return bus.NewBusOpt(busType)
+func NewBusOptions(busType string) *bus.Options {
+	return bus.NewOptions(busType)
 }
 
 // NewBus is a convenience wrapper around
 // bus.NewBus. This way the user won't need to import
 // another package for most use cases.
-func NewBus(conf *bus.BusOpt) (*bus.Bus, error) {
+func NewBus(conf *bus.Options) (*bus.Bus, error) {
 	return bus.NewBus(conf)
 }
 
 // NewProducer is a convenience wrapper around
 // bus.NewProducer. This way the user won't need to import
 // another package for most use cases.
-func NewProducer(conf *bus.BusOpt) (bus.ProducerBus, error) {
+func NewProducer(conf *bus.Options) (bus.ProducerBus, error) {
 	return bus.NewProducer(conf)
 }
 
 // NewConsumer is a convenience wrapper around
 // bus.NewConsumer. This way the user won't need to import
 // another package for most use cases.
-func NewConsumer(conf *bus.BusOpt) (bus.ConsumerBus, error) {
+func NewConsumer(conf *bus.Options) (bus.ConsumerBus, error) {
 	return bus.NewConsumer(conf)
 }
 
-// NewLauncherOpt returns a new LauncherOpt.
-func NewLauncherOpt() *LauncherOpt {
-	return &LauncherOpt{
+// NewLauncherOptions returns a new LauncherOptions.
+func NewLauncherOptions() *LauncherOptions {
+	return &LauncherOptions{
 		MaxInProgress:      1,
 		WorkerTimeout:      defaultWorkerTimeout,
 		LifetimeMaxWorkers: 0, // not enabled by default
@@ -56,9 +56,9 @@ func NewLauncherOpt() *LauncherOpt {
 	}
 }
 
-// LauncherOpt contains the options for initializing a
+// LauncherOptions contains the options for initializing a
 // new launcher.
-type LauncherOpt struct {
+type LauncherOptions struct {
 	// MaxInProgress is the max number tasks
 	// in progress at one time.
 	MaxInProgress int `toml:"max_in_progress"`
@@ -87,13 +87,13 @@ type LauncherOpt struct {
 }
 
 // NewLauncher creates a new launcher.
-func NewLauncher(mkr MakeWorker, opt *LauncherOpt, bOpt *bus.BusOpt) (*Launcher, error) {
+func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Launcher, error) {
 	if opt == nil {
-		opt = NewLauncherOpt()
+		opt = NewLauncherOptions()
 	}
 
 	if bOpt == nil {
-		bOpt = NewBusOpt("")
+		bOpt = NewBusOptions("")
 	}
 
 	// consumer
@@ -113,10 +113,10 @@ func NewLauncher(mkr MakeWorker, opt *LauncherOpt, bOpt *bus.BusOpt) (*Launcher,
 
 // NewLauncherFromBus returns a Launcher from the provided
 // consumer and producer buses.
-func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, opt *LauncherOpt) *Launcher {
+func NewLauncherFromBus(mke MakeWorker, c bus.ConsumerBus, p bus.ProducerBus, opt *LauncherOptions) *Launcher {
 	// launcher options
 	if opt == nil {
-		opt = NewLauncherOpt()
+		opt = NewLauncherOptions()
 	}
 
 	// make sure maxInProgress is at least 1
@@ -204,7 +204,7 @@ type Launcher struct {
 	// isDoing indicates the launcher has already launched the task loop
 	isDoing bool
 
-	opt      *LauncherOpt
+	opt      *LauncherOptions
 	consumer bus.ConsumerBus
 	producer bus.ProducerBus
 	mke      MakeWorker // for creating new workers
