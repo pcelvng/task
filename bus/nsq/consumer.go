@@ -8,7 +8,7 @@ import (
 	gonsq "github.com/bitly/go-nsq"
 )
 
-func NewConsumer(topic, channel string, opt *Opt) (*Consumer, error) {
+func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
 	// initialized at 0 to pause reading on startup
 	maxInFlight := 0
 
@@ -39,7 +39,7 @@ func NewConsumer(topic, channel string, opt *Opt) (*Consumer, error) {
 }
 
 type Consumer struct {
-	opt      *Opt
+	opt      *Option
 	nsqConf  *gonsq.Config
 	consumer *gonsq.Consumer
 

@@ -9,12 +9,13 @@ import (
 	nsqbus "github.com/pcelvng/task/bus/nsq"
 )
 
-var (
+const (
 	defaultBus       = "stdio"
 	defaultReadPath  = "./in.tsks.json"
 	defaultWritePath = "./out.tsks.json"
-	defaultNSQd      = []string{"localhost:4150"}
 )
+
+var defaultNSQd = []string{"localhost:4150"}
 
 func NewOptions(bus string) *Options {
 	if bus == "" {
@@ -92,15 +93,15 @@ func NewBus(opt *Options) (*Bus, error) {
 }
 
 // Bus combines a consumer and producer into a single struct
-// and implements both the ConsumerBus and ProducerBus interfaces.
+// and implements both the Consumer and Producer interfaces.
 //
 // Bus is the same as getting a Consumer and Producer
 // separately but having them available in a single object.
 //
 // Calling Stop() will stop the producer first then the consumer.
 type Bus struct {
-	consumer ConsumerBus
-	producer ProducerBus
+	consumer Consumer
+	producer Producer
 }
 
 func (b *Bus) Msg() (msg []byte, done bool, err error) {
@@ -126,9 +127,9 @@ func (b *Bus) Stop() error {
 	return nil
 }
 
-// NewProducer creates a bus producer from Options.
-func NewProducer(opt *Options) (ProducerBus, error) {
-	var p ProducerBus
+// NewProducer creates a bus producer from Option.
+func NewProducer(opt *Options) (Producer, error) {
+	var p Producer
 	var err error
 	// normalize bus value
 	busType := opt.Bus
@@ -149,7 +150,7 @@ func NewProducer(opt *Options) (ProducerBus, error) {
 
 		p, err = iobus.NewProducer(writePth)
 	case "nsq":
-		nsqOpt := &nsqbus.Opt{}
+		nsqOpt := &nsqbus.Option{}
 		if len(opt.NSQdHosts) == 0 {
 			nsqOpt.NSQdAddrs = defaultNSQd
 		} else {
@@ -177,8 +178,8 @@ func NewProducer(opt *Options) (ProducerBus, error) {
 }
 
 // NewConsumer creates a bus consumer from BusConfig.
-func NewConsumer(opt *Options) (ConsumerBus, error) {
-	var c ConsumerBus
+func NewConsumer(opt *Options) (Consumer, error) {
+	var c Consumer
 	var err error
 
 	// normalize bus value
@@ -200,7 +201,7 @@ func NewConsumer(opt *Options) (ConsumerBus, error) {
 
 		c, err = iobus.NewConsumer(readPth)
 	case "nsq":
-		nsqOpt := &nsqbus.Opt{}
+		nsqOpt := &nsqbus.Option{}
 		if len(opt.LookupdHosts) > 0 {
 			nsqOpt.LookupdAddrs = opt.LookupdHosts
 		} else if len(opt.NSQdHosts) > 0 {

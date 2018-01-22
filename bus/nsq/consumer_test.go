@@ -62,7 +62,7 @@ var (
 func TestNewConsumer(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 	// Logger:       logger,
 	// NSQdAddrs: []string{"localhost:4150"},
 	// LookupdAddrs: []string{"localhost:4160"},
@@ -82,7 +82,7 @@ func TestNewConsumer(t *testing.T) {
 func TestConsumer_ConnectNoTopic(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 	// Logger:       logger,
 	// NSQdAddrs: []string{"localhost:4150"},
 	// LookupdAddrs: []string{"localhost:4160"},
@@ -106,7 +106,7 @@ func TestConsumer_ConnectNoTopic(t *testing.T) {
 func TestConsumer_ConnectNoChannel(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 	// Logger:       logger,
 	// NSQdAddrs: []string{"localhost:4150"},
 	// LookupdAddrs: []string{"localhost:4160"},
@@ -130,7 +130,7 @@ func TestConsumer_ConnectNoChannel(t *testing.T) {
 func TestConsumer_Connect(t *testing.T) {
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
@@ -165,7 +165,7 @@ func TestConsumer_ConnectNSQdsBad(t *testing.T) {
 	// TEST BAD NSQD
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 		Logger:    logger,
 		NSQdAddrs: []string{"localhost:4000"},
 		// LookupdAddrs: []string{"localhost:4160"},
@@ -190,7 +190,7 @@ func TestConsumer_ConnectNSQds(t *testing.T) {
 	// TEST GOOD NSQD
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 		Logger:    logger,
 		NSQdAddrs: []string{"localhost:4150"},
 		// LookupdAddrs: []string{"localhost:4160"},
@@ -224,7 +224,7 @@ func TestConsumer_ConnectLookupdsBad(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4000"}, // bad port
@@ -265,7 +265,7 @@ func TestConsumer_ConnectLookupds(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port
@@ -310,7 +310,7 @@ func TestConsumer_Msg(t *testing.T) {
 
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Opt{
+	opt := &Option{
 		Logger: logger,
 		// NSQdAddrs: []string{"localhost:4150"},
 		LookupdAddrs: []string{"localhost:4161"}, // good port

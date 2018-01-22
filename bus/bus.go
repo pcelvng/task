@@ -1,11 +1,11 @@
 package bus
 
-type ConsumerBus interface {
+type Consumer interface {
 	Msg() (msg []byte, done bool, err error)
 	Stop() error
 }
 
-type ProducerBus interface {
+type Producer interface {
 	Send(topic string, msg []byte) error
 	Stop() error
 }
