@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 func TestPkg(t *testing.T) {
 	// create producer
 	path := testFile
-	p, err := NewFileProducer(path)
+	p, err := NewProducer(path)
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -41,7 +41,7 @@ func TestPkg(t *testing.T) {
 	}
 
 	// create consumer
-	c, err := NewFileConsumer(path)
+	c, err := NewConsumer(path)
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -106,7 +106,7 @@ func TestPkg(t *testing.T) {
 func TestParallel(t *testing.T) {
 	// create producer
 	path := testParallelFile
-	p, err := NewFileProducer(path)
+	p, err := NewProducer(path)
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
@@ -141,7 +141,7 @@ func TestParallel(t *testing.T) {
 	}
 
 	// create consumer
-	c, err := NewFileConsumer(path)
+	c, err := NewConsumer(path)
 	if err != nil {
 		t.Fatalf("expected nil but got '%v'\n", err.Error())
 	}
