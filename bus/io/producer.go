@@ -1,50 +1,51 @@
 package io
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"strings"
 	"sync"
 )
 
-func NewStdoutProducer() *Producer {
+func NewProducer(pth string) (*Producer, error) {
+	var f *os.File
+	var err error
+
+	// special handling of device files
+	switch pth {
+	case "/dev/stdout":
+		f = os.Stdout
+	case "/dev/stderr":
+		f = os.Stderr
+	case "/dev/null":
+		fallthrough
+	default:
+		f, err = os.Create(pth) // will truncate file if already exists
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// create context for clean shutdown
 	ctx, cncl := context.WithCancel(context.Background())
 
 	return &Producer{
-		writeCloser: os.Stdout,
-		writer:      bufio.NewWriter(os.Stdout),
-		ctx:         ctx,
-		cncl:        cncl,
-	}
-}
-
-func NewFileProducer(path string) (*Producer, error) {
-	f, err := os.Create(path) // will truncate file if already exists
-	if err != nil {
-		return nil, err
-	}
-
-	// create context for clean shutdown
-	ctx, cncl := context.WithCancel(context.Background())
-
-	return &Producer{
-		writeCloser: f,
-		writer:      bufio.NewWriter(f),
-		ctx:         ctx,
-		cncl:        cncl,
+		pth:  pth,
+		f:    f,
+		ctx:  ctx,
+		cncl: cncl,
 	}, nil
 }
 
 type Producer struct {
-	sync.Mutex
-	writeCloser io.WriteCloser
-	writer      *bufio.Writer
-	ctx         context.Context
-	cncl        context.CancelFunc
+	f   *os.File
+	pth string // file path
+
+	ctx  context.Context
+	cncl context.CancelFunc
+	mu   sync.Mutex
 }
 
 func (p *Producer) Send(_ string, msg []byte) error {
@@ -52,8 +53,8 @@ func (p *Producer) Send(_ string, msg []byte) error {
 		msg = append(msg, '\n')
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	// should not attempt to send if already stopped.
 	if p.ctx.Err() != nil {
@@ -61,11 +62,10 @@ func (p *Producer) Send(_ string, msg []byte) error {
 		return errors.New(errMsg)
 	}
 
-	_, err := p.writer.Write(msg)
+	_, err := p.f.Write(msg)
 	if err != nil {
 		return err
 	}
-	p.writer.Flush()
 
 	return err
 }
@@ -76,9 +76,10 @@ func (p *Producer) Stop() error {
 	}
 	p.cncl()
 
-	if err := p.writeCloser.Close(); err != nil {
-		return err
+	// don't close device files
+	if strings.HasPrefix(p.pth, "/dev/") {
+		return nil
 	}
 
-	return nil
+	return p.f.Close()
 }

@@ -139,14 +139,15 @@ func NewProducer(opt *Options) (ProducerBus, error) {
 
 	switch busType {
 	case "stdout", "stdio", "":
-		p = iobus.NewStdoutProducer()
+		opt.OutFile = "/dev/stdout"
+		fallthrough
 	case "file":
-		writePath := opt.OutFile
-		if writePath == "" {
-			writePath = defaultWritePath
+		writePth := opt.OutFile
+		if writePth == "" {
+			writePth = defaultWritePath
 		}
 
-		p, err = iobus.NewFileProducer(writePath)
+		p, err = iobus.NewProducer(writePth)
 	case "nsq":
 		nsqOpt := &nsqbus.Opt{}
 		if len(opt.NSQdHosts) == 0 {
@@ -189,14 +190,15 @@ func NewConsumer(opt *Options) (ConsumerBus, error) {
 
 	switch busType {
 	case "stdin", "stdio", "":
-		c = iobus.NewStdinConsumer()
+		opt.InFile = "/dev/stdin"
+		fallthrough
 	case "file":
-		readPath := opt.InFile
-		if readPath == "" {
-			readPath = defaultReadPath
+		readPth := opt.InFile
+		if readPth == "" {
+			readPth = defaultReadPath
 		}
 
-		c, err = iobus.NewFileConsumer(readPath)
+		c, err = iobus.NewConsumer(readPth)
 	case "nsq":
 		nsqOpt := &nsqbus.Opt{}
 		if len(opt.LookupdHosts) > 0 {

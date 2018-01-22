@@ -4,62 +4,48 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"io"
 	"os"
+	"strings"
 	"sync"
 )
 
-func NewStdinConsumer() *Consumer {
-	// context for safe shutdown
-	ctx, cncl := context.WithCancel(context.Background())
+func NewConsumer(pth string) (*Consumer, error) {
+	var f *os.File
+	var err error
 
-	c := &Consumer{
-		readCloser: os.Stdin,
-		ctx:        ctx,
-		cncl:       cncl,
-	}
-
-	c.connect()
-	return c
-}
-
-func NewFileConsumer(path string) (*Consumer, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
+	// special handling of device files
+	switch pth {
+	case "/dev/stdin":
+		f = os.Stdin
+	default:
+		f, err = os.Open(pth)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// context for safe shutdown
 	ctx, cncl := context.WithCancel(context.Background())
 
 	c := &Consumer{
-		readCloser: f,
-		ctx:        ctx,
-		cncl:       cncl,
-	}
-
-	err = c.connect()
-	if err != nil {
-		return nil, err
+		scanner: bufio.NewScanner(f),
+		f:       f,
+		pth:     pth,
+		ctx:     ctx,
+		cncl:    cncl,
 	}
 
 	return c, nil
 }
 
 type Consumer struct {
+	f       *os.File
+	scanner *bufio.Scanner // scanners have line length limit, but should not be a problem here
+	pth     string
+
+	ctx  context.Context
+	cncl context.CancelFunc
 	sync.Mutex
-	readCloser io.ReadCloser
-	scanner    *bufio.Scanner
-	ctx        context.Context
-	cncl       context.CancelFunc
-}
-
-func (c *Consumer) connect() error {
-	if c.scanner == nil {
-		c.scanner = bufio.NewScanner(c.readCloser)
-	}
-
-	return nil
 }
 
 func (c *Consumer) Msg() (msg []byte, done bool, err error) {
@@ -94,9 +80,10 @@ func (c *Consumer) Stop() error {
 	}
 	c.cncl()
 
-	if err := c.readCloser.Close(); err != nil {
-		return err
+	// don't close device files
+	if strings.HasPrefix(c.pth, "/dev/") {
+		return nil
 	}
 
-	return nil
+	return c.f.Close()
 }
