@@ -454,12 +454,7 @@ func (l *Launcher) doLaunch(tsk *Task) {
 }
 
 func (l *Launcher) sendTsk(tsk *Task) {
-	tskB, err := tsk.JSONBytes() // End() should already be called
-	if err != nil {
-		l.log(err.Error())
-	} else {
-		l.producer.Send(l.opt.DoneTopic, tskB)
-	}
+	l.producer.Send(l.opt.DoneTopic, tsk.JSONBytes())
 }
 
 // giveSlot will attempt to give back a slot.

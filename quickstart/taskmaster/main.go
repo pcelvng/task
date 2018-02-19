@@ -14,7 +14,7 @@ var (
 func main() {
 	flag.Parse()
 
-	tskJson, _ := task.New(*tskType, *tskInfo).JSONBytes()
+	tskJson := task.New(*tskType, *tskInfo).JSONBytes()
 	tskBus, _ := task.NewBus(task.NewBusOptions(""))
 	tskBus.Send("", tskJson)
 }
