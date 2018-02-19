@@ -115,23 +115,14 @@ func (t *Task) End(r Result, msg string) time.Time {
 }
 
 // JSONBytes returns the task json bytes.
-func (t *Task) JSONBytes() ([]byte, error) {
-	b, err := json.Marshal(t)
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
+func (t *Task) JSONBytes() []byte {
+	b, _ := json.Marshal(t)
+	return b
 }
 
 // String returns json string.
-func (t *Task) JSONString() (string, error) {
-	b, err := t.JSONBytes()
-	if err != nil {
-		return "", err
-	}
-
-	return string(b), nil
+func (t *Task) JSONString() string {
+	return string(t.JSONBytes())
 }
 
 type Result string
