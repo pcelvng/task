@@ -8,7 +8,7 @@ import (
 // New creates a new Task with the provided type
 // and info and sets the created date.
 func New(tskType, info string) *Task {
-	now := time.Now()
+	now := time.Now().In(time.UTC)
 	return &Task{
 		Type:    tskType,
 		Info:    info,
@@ -35,7 +35,7 @@ func NewFromBytes(b []byte) (*Task, error) {
 		if err != nil {
 			return nil, err
 		}
-		t.created = created
+		t.created = created.In(time.UTC)
 		if t.created.IsZero() {
 			t.Created = ""
 		}
@@ -46,7 +46,7 @@ func NewFromBytes(b []byte) (*Task, error) {
 		if err != nil {
 			return nil, err
 		}
-		t.started = started
+		t.started = started.In(time.UTC)
 		if t.started.IsZero() {
 			t.Started = ""
 		}
@@ -57,7 +57,7 @@ func NewFromBytes(b []byte) (*Task, error) {
 		if err != nil {
 			return nil, err
 		}
-		t.ended = ended
+		t.ended = ended.In(time.UTC)
 		if t.ended.IsZero() {
 			t.Ended = ""
 		}
@@ -91,7 +91,7 @@ type Task struct {
 // value is returned.
 func (t *Task) Start() time.Time {
 	if t.started.IsZero() {
-		t.started = time.Now()
+		t.started = time.Now().In(time.UTC)
 		t.Started = t.started.Format(time.RFC3339)
 	}
 
@@ -107,7 +107,7 @@ func (t *Task) End(r Result, msg string) time.Time {
 	if t.ended.IsZero() {
 		t.Result = r
 		t.Msg = msg
-		t.ended = time.Now()
+		t.ended = time.Now().In(time.UTC)
 		t.Ended = t.ended.Format(time.RFC3339)
 	}
 
