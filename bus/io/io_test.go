@@ -23,21 +23,18 @@ func TestMain(m *testing.M) {
 func TestPkg(t *testing.T) {
 	// create producer
 	path := testFile
-	p, err := NewProducer(path)
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
-	}
+	p := NewProducer()
 
 	tmsg1 := []byte("test message 1")
 	tmsg2 := []byte("test message 2")
-	err = p.Send("", tmsg1)
+	err := p.Send(path, tmsg1)
 	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
+		t.Fatalf("expected nil but got err '%v'", err.Error())
 	}
 
-	err = p.Send("", tmsg2)
+	err = p.Send(path, tmsg2)
 	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
+		t.Fatalf("expected nil but got err '%v'", err.Error())
 	}
 
 	// create consumer
@@ -106,10 +103,7 @@ func TestPkg(t *testing.T) {
 func TestParallel(t *testing.T) {
 	// create producer
 	path := testParallelFile
-	p, err := NewProducer(path)
-	if err != nil {
-		t.Fatalf("expected nil but got '%v'\n", err.Error())
-	}
+	p := NewProducer()
 
 	// load up messages in parallel
 	pMsgCnt := 1000
@@ -122,7 +116,7 @@ func TestParallel(t *testing.T) {
 			defer wg.Done()
 			<-releaseChan
 
-			err := p.Send("", []byte("test message"))
+			err := p.Send(path, []byte("test message"))
 			if err != nil {
 				atomic.AddInt64(&errCntGot, 1)
 			}
