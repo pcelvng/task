@@ -10,9 +10,7 @@ import (
 )
 
 const (
-	defaultBus       = "stdio"
-	defaultReadPath  = "./in.tsks.json"
-	defaultWritePath = "./out.tsks.json"
+	defaultBus = "stdio"
 )
 
 var defaultNSQd = []string{"localhost:4150"}
@@ -24,8 +22,6 @@ func NewOptions(bus string) *Options {
 
 	return &Options{
 		Bus:       bus,
-		InFile:    defaultReadPath,
-		OutFile:   defaultWritePath,
 		NSQdHosts: defaultNSQd,
 	}
 }
@@ -42,12 +38,12 @@ type Options struct {
 	// - "nsq"
 	// - "nop" - no-operation bus for testing
 	Bus    string `toml:"bus"`
-	InBus  string `toml:"in_bus"`
-	OutBus string `toml:"out_bus"`
+	InBus  string `toml:"in_bus"`  // to have a different consumer and producer
+	OutBus string `toml:"out_bus"` // to have a different consumer and producer
 
-	// for "file" bus type
-	InFile  string `toml:"in_file"`  // file producer
-	OutFile string `toml:"out_file"` // file consumer
+	// consumer topic and channel
+	InTopic   string `toml:"in_topic"`   // required for consumers
+	InChannel string `toml:"in_channel"` // required for consumers
 
 	// for "nsq" bus type
 	NSQdHosts    []string `toml:"nsqd_hosts"`    // nsq producer or consumer
@@ -65,11 +61,7 @@ type Options struct {
 	// - "msg_done" - returns a nil task message done=true on Consumer.Msg() call.
 	// - "msg_msg_done" - returns a non-nil task message and done=true Consumer.Msg() call.
 	// - "stop_err" - returns err on Stop() method call
-	NopMock string
-
-	// consumer topic and channel
-	Topic   string `toml:"topic"`   // required for consumers
-	Channel string `toml:"channel"` // required for consumers
+	NopMock string `toml:"-"`
 }
 
 // NewBus returns in instance of Bus.
@@ -131,6 +123,7 @@ func (b *Bus) Stop() error {
 func NewProducer(opt *Options) (Producer, error) {
 	var p Producer
 	var err error
+
 	// normalize bus value
 	busType := opt.Bus
 	if opt.OutBus != "" {
@@ -140,15 +133,9 @@ func NewProducer(opt *Options) (Producer, error) {
 
 	switch busType {
 	case "stdout", "stdio", "":
-		opt.OutFile = "/dev/stdout"
-		fallthrough
+		p = iobus.NewStdoutProducer()
 	case "file":
-		writePth := opt.OutFile
-		if writePth == "" {
-			writePth = defaultWritePath
-		}
-
-		p, err = iobus.NewProducer(writePth)
+		p = iobus.NewProducer()
 	case "nsq":
 		nsqOpt := &nsqbus.Option{}
 		if len(opt.NSQdHosts) == 0 {
@@ -191,15 +178,10 @@ func NewConsumer(opt *Options) (Consumer, error) {
 
 	switch busType {
 	case "stdin", "stdio", "":
-		opt.InFile = "/dev/stdin"
+		opt.InTopic = "/dev/stdin"
 		fallthrough
 	case "file":
-		readPth := opt.InFile
-		if readPth == "" {
-			readPth = defaultReadPath
-		}
-
-		c, err = iobus.NewConsumer(readPth)
+		c, err = iobus.NewConsumer(opt.InTopic)
 	case "nsq":
 		nsqOpt := &nsqbus.Option{}
 		if len(opt.LookupdHosts) > 0 {
@@ -210,7 +192,7 @@ func NewConsumer(opt *Options) (Consumer, error) {
 			nsqOpt.NSQdAddrs = defaultNSQd
 		}
 
-		c, err = nsqbus.NewConsumer(opt.Topic, opt.Channel, nsqOpt)
+		c, err = nsqbus.NewConsumer(opt.InTopic, opt.InChannel, nsqOpt)
 	case "nop":
 		c, err = nop.NewConsumer(opt.NopMock)
 	default:

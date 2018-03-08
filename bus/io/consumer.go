@@ -3,12 +3,17 @@ package io
 import (
 	"bufio"
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"sync"
 )
 
 func NewConsumer(pth string) (*Consumer, error) {
+	if pth == "" {
+		return nil, errors.New("path required")
+	}
+
 	var f *os.File
 	var err error
 
@@ -42,7 +47,7 @@ func NewConsumer(pth string) (*Consumer, error) {
 type Consumer struct {
 	f       *os.File
 	scanner *bufio.Scanner // scanners have line length limit, but should not be a problem here
-	pth     string
+	pth     string         // file path. equivalent to a 'topic' on other buses.
 
 	ctx  context.Context
 	cncl context.CancelFunc

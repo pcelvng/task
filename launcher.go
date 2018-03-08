@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	defaultWorkerTimeout      = time.Second * 10
-	defaultDoneTopic          = "done"
-	defaultMaxInProgress uint = 1
+	defaultWorkerKillTime      = time.Second * 10
+	defaultDoneTopic           = "done"
+	defaultMaxInProgress  uint = 1
 )
 
 // NewBusOptions is a convenience wrapper around
@@ -48,11 +48,11 @@ func NewConsumer(conf *bus.Options) (bus.Consumer, error) {
 // NewLauncherOptions returns a new LauncherOptions.
 func NewLauncherOptions() *LauncherOptions {
 	return &LauncherOptions{
-		MaxInProgress: defaultMaxInProgress,
-		WorkerTimeout: defaultWorkerTimeout,
-		DoneTopic:     defaultDoneTopic,
-		TaskType:      "",
-		Logger:        log.New(os.Stderr, "", log.LstdFlags),
+		MaxInProgress:    defaultMaxInProgress,
+		WorkerKillTime:   defaultWorkerKillTime,
+		DoneTopic:        defaultDoneTopic,
+		EnforcedTaskType: "",
+		Logger:           log.New(os.Stderr, "", log.LstdFlags),
 	}
 }
 
@@ -63,26 +63,26 @@ type LauncherOptions struct {
 	// in progress at one time.
 	MaxInProgress uint `toml:"max_in_progress"`
 
-	// WorkerTimeout is how long the launcher will
+	// WorkerKillTime is how long the launcher will
 	// wait for a forced-shutdown worker to cleanup.
-	WorkerTimeout time.Duration `toml:"worker_timeout"`
+	WorkerKillTime time.Duration `toml:"worker_kill_time"`
 
-	// LifetimeMaxWorkers - maximum number of tasks the
+	// LifetimeWorkers - maximum number of tasks the
 	// launcher will process before closing.
 	//
 	// The default value of 0 means there is no limit.
-	LifetimeMaxWorkers uint `toml:"lifetime_max_workers"`
+	LifetimeWorkers uint `toml:"lifetime_workers"`
 
 	// DoneTopic - topic to publish to for done tasks.
 	// Default: "done"
 	DoneTopic string `toml:"done_topic"`
 
-	// TaskType will check that the received task type
-	// matches TaskType and if not then will return the task
+	// EnforcedTaskType will check that the received task type
+	// matches EnforcedTaskType and if not then will return the task
 	// with a task type mismatch error.
 	//
-	// If TaskType is empty then check will be skipped.
-	TaskType string `toml:"task_type"`
+	// If EnforcedTaskType is empty then check will be skipped.
+	EnforcedTaskType string `toml:"task_type"`
 
 	// custom logger option
 	Logger *log.Logger `toml:"-"`
@@ -135,9 +135,9 @@ func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Lau
 	}
 
 	// use default timeout if none provided.
-	workerTimeout := defaultWorkerTimeout
-	if opt.WorkerTimeout > 0 {
-		workerTimeout = opt.WorkerTimeout
+	workerTimeout := defaultWorkerKillTime
+	if opt.WorkerKillTime > 0 {
+		workerTimeout = opt.WorkerKillTime
 	}
 
 	// create max in progress slots
@@ -147,7 +147,7 @@ func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Lau
 	}
 
 	// lifetime max remaining (0; no lifetime max)
-	remaining := opt.LifetimeMaxWorkers
+	remaining := opt.LifetimeWorkers
 
 	// doneCncl (done cancel function)
 	// - is called internally by the launcher to signal that the launcher
@@ -416,9 +416,9 @@ func (l *Launcher) doLaunch(tsk *Task) {
 	tsk.Start()
 	defer l.sendTsk(tsk)
 
-	// check task type (if TaskType specified)
-	if l.opt.TaskType != "" && l.opt.TaskType != tsk.Type {
-		msg := fmt.Sprintf("wrong task type; expected '%v'", l.opt.TaskType)
+	// check task type (if EnforcedTaskType specified)
+	if l.opt.EnforcedTaskType != "" && l.opt.EnforcedTaskType != tsk.Type {
+		msg := fmt.Sprintf("unexpected task type '%v' wanting '%v'", tsk.Type, l.opt.EnforcedTaskType)
 		tsk.End(ErrResult, msg)
 		return
 	}
