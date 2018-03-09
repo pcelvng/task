@@ -10,12 +10,22 @@ func NewStdoutProducer() *Producer {
 	return &Producer{isStdout: true}
 }
 
+func NewNullProducer() *Producer {
+	return &Producer{isNull: true}
+}
+
+func NewStdErrProducer() *Producer {
+	return &Producer{isStderr: true}
+}
+
 func NewProducer() *Producer {
 	return &Producer{}
 }
 
 type Producer struct {
 	isStdout bool
+	isNull   bool
+	isStderr bool
 	mu       sync.Mutex
 }
 
@@ -28,6 +38,14 @@ type Producer struct {
 func (p *Producer) Send(topic string, msg []byte) error {
 	if p.isStdout {
 		topic = "/dev/stdout" // topic is always stdout.
+	}
+
+	if p.isNull {
+		topic = "/dev/null"
+	}
+
+	if p.isStderr {
+		topic = "/dev/stderr"
 	}
 
 	if topic == "" {
