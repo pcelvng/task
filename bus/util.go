@@ -34,6 +34,8 @@ type Options struct {
 	// - "stdio" (generic stdin, stdout)
 	// - "stdin" (for consumer)
 	// - "stdout" (for producer)
+	// - "stderr" (for producer)
+	// - "null" (for producer)
 	// - "file"
 	// - "nsq"
 	// - "nop" - no-operation bus for testing
@@ -64,7 +66,7 @@ type Options struct {
 	NopMock string `toml:"-"`
 }
 
-// NewBus returns in instance of Bus.
+// NewBus returns an instance of Bus.
 func NewBus(opt *Options) (*Bus, error) {
 	// make consumer
 	c, err := NewConsumer(opt)
@@ -132,6 +134,10 @@ func NewProducer(opt *Options) (Producer, error) {
 	}
 
 	switch busType {
+	case "null":
+		p = iobus.NewNullProducer()
+	case "stderr":
+		p = iobus.NewStdErrProducer()
 	case "stdout", "stdio", "":
 		p = iobus.NewStdoutProducer()
 	case "file":
