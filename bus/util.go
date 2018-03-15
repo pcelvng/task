@@ -68,6 +68,10 @@ type Options struct {
 
 // NewBus returns an instance of Bus.
 func NewBus(opt *Options) (*Bus, error) {
+	if opt == nil {
+		opt = NewOptions("")
+	}
+
 	// make consumer
 	c, err := NewConsumer(opt)
 	if err != nil {
@@ -123,6 +127,10 @@ func (b *Bus) Stop() error {
 
 // NewProducer creates a bus producer from Option.
 func NewProducer(opt *Options) (Producer, error) {
+	if opt == nil {
+		opt = NewOptions("")
+	}
+
 	var p Producer
 	var err error
 
@@ -172,6 +180,10 @@ func NewProducer(opt *Options) (Producer, error) {
 
 // NewConsumer creates a bus consumer from BusConfig.
 func NewConsumer(opt *Options) (Consumer, error) {
+	if opt == nil {
+		opt = NewOptions("")
+	}
+
 	var c Consumer
 	var err error
 
