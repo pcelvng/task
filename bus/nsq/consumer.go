@@ -9,6 +9,10 @@ import (
 )
 
 func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
+	if opt == nil {
+		opt = &Option{}
+	}
+
 	// initialized at 0 to pause reading on startup
 	maxInFlight := 0
 

@@ -12,6 +12,10 @@ import (
 )
 
 func NewProducer(opt *Option) (*Producer, error) {
+	if opt == nil {
+		opt = &Option{}
+	}
+
 	// context for clean shutdown
 	ctx, cncl := context.WithCancel(context.Background())
 
