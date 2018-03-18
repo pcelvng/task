@@ -45,53 +45,64 @@ func NewConsumer(conf *bus.Options) (bus.Consumer, error) {
 	return bus.NewConsumer(conf)
 }
 
-// NewLauncherOptions returns a new LauncherOptions.
-func NewLauncherOptions() *LauncherOptions {
+// LauncherOptions returns a new LauncherOptions.
+func NewLauncherOptions(tskType string) *LauncherOptions {
 	return &LauncherOptions{
-		MaxInProgress:    defaultMaxInProgress,
-		WorkerKillTime:   defaultWorkerKillTime,
-		DoneTopic:        defaultDoneTopic,
-		EnforcedTaskType: "",
-		Logger:           log.New(os.Stderr, "", log.LstdFlags),
+		MaxInProgress:  defaultMaxInProgress,
+		WorkerKillTime: defaultWorkerKillTime,
+		DoneTopic:      defaultDoneTopic,
+		TaskType:       tskType, // not required but highly encouraged
 	}
 }
 
 // LauncherOptions contains the options for initializing a
-// new launcher.
+// new launcher. The default values will likely work for most cases.
 type LauncherOptions struct {
 	// MaxInProgress is the max number tasks
 	// in progress at one time.
-	MaxInProgress uint `toml:"max_in_progress"`
+	MaxInProgress uint `toml:"max_in_progress" commented:"true"`
 
 	// WorkerKillTime is how long the launcher will
 	// wait for a forced-shutdown worker to cleanup.
-	WorkerKillTime time.Duration `toml:"worker_kill_time"`
+	WorkerKillTime time.Duration `toml:"worker_kill_time" commented:"true"`
 
 	// LifetimeWorkers - maximum number of tasks the
 	// launcher will process before closing.
 	//
 	// The default value of 0 means there is no limit.
-	LifetimeWorkers uint `toml:"lifetime_workers"`
+	LifetimeWorkers uint `toml:"lifetime_workers" commented:"true"`
 
 	// DoneTopic - topic to publish to for done tasks.
 	// Default: "done"
-	DoneTopic string `toml:"done_topic"`
+	DoneTopic string `toml:"done_topic" commented:"true"`
 
-	// EnforcedTaskType will check that the received task type
-	// matches EnforcedTaskType and if not then will return the task
-	// with a task type mismatch error.
+	// TaskType is highly encouraged to be provided. The task type is important for worker discovery and necessary
+	// for expected functioning of the RejectBadType and IgnoreBadType options.
+	// The default handling of a task with an non-matching task type is to create the worker anyway.
+	TaskType string `toml:"-"`
+
+	// RejectBadType will reject all task types that are not registered
+	// with the launcher with RegisterType.
 	//
-	// If EnforcedTaskType is empty then check will be skipped.
-	EnforcedTaskType string `toml:"task_type"`
+	// Note that if both RejectBadType and IgnoreBadType are true then the launcher will
+	// act as if only RejectBadType were true.
+	RejectBadType bool `toml:"reject_bad_type" commented:'true' comment:"if true then unregistered task types are returned to the bus with an 'error' result and no worker is launched"`
+
+	// RejectBadType will reject all task types that are not registered
+	// with the launcher with RegisterType.
+	//
+	// Note that if both RejectBadType and IgnoreBadType are true then the launcher will
+	// act as if only RejectBadType were true.
+	IgnoreBadType bool `toml:"ignore_bad_type" commented:'true' comment:"if true then unregistered task types are ignored and no worker is launched`
 
 	// custom logger option
 	Logger *log.Logger `toml:"-"`
 }
 
-// NewLauncher creates a new launcher.
-func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Launcher, error) {
+// Launcher creates a new launcher.
+func Launcher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*launcher, error) {
 	if opt == nil {
-		opt = NewLauncherOptions()
+		opt = NewLauncherOptions("")
 	}
 
 	if bOpt == nil {
@@ -110,22 +121,26 @@ func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Laun
 		return nil, err
 	}
 
-	return NewLauncherFromBus(mkr, c, p, opt), nil
+	return LauncherFromBus(mkr, c, p, opt), nil
 }
 
-// NewLauncherFromBus returns a Launcher from the provided
+// NewLauncherFromBus returns a launcher from the provided
 // consumer and producer buses.
 //
 // Usually not necessary to use directly unless the caller
 // is providing a non-standard library consumer, producer buses.
-
-func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *Launcher {
+func LauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *launcher {
 	// launcher options
 	if opt == nil {
-		opt = NewLauncherOptions()
+		opt = NewLauncherOptions("")
 	}
 	if opt.DoneTopic == "" {
 		opt.DoneTopic = defaultDoneTopic
+	}
+
+	lgr := log.New(os.Stderr, "", log.LstdFlags)
+	if opt.Logger != nil {
+		lgr = opt.Logger
 	}
 
 	// make sure maxInProgress is at least 1
@@ -179,13 +194,30 @@ func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Lau
 		opt.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
-	return &Launcher{
+	// unmatching task type handling
+	typeHandling := ""
+	if opt.IgnoreBadType {
+		typeHandling = "ignore"
+	}
+	if opt.RejectBadType {
+		typeHandling = "reject"
+	}
+
+	// warn if typeHandling is set and
+	// a task type is not provided.
+	if typeHandling != "" && opt.TaskType == "" {
+		lgr.Printf("NO WORKERS WILL BE LAUNCHED! task type handling is set to '%v' but no task type is provided", typeHandling)
+	}
+
+	return &launcher{
 		isInitialized: true,
 		consumer:      c,
 		producer:      p,
 		opt:           opt,
 		mke:           mke,
-		logger:        opt.Logger,
+		lgr:           opt.Logger,
+		taskType:      opt.TaskType,
+		typeHandling:  typeHandling,
 		doneCtx:       doneCtx,
 		doneCncl:      doneCncl,
 		stopCtx:       stopCtx,
@@ -199,29 +231,31 @@ func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Lau
 	}
 }
 
-// Launcher handles the heavy lifting of worker lifecycle, general
+// launcher handles the heavy lifting of worker lifecycle, general
 // task management and interacting with the bus.
 //
 // The calling routine should listen on context.Done to know if
-// the Launcher has shut itself down.
+// the launcher has shut itself down.
 //
 // The calling routine can force the launcher to shutdown by calling
 // the cancelFunc and then listening on context.Done to know when
-// the Launcher has shutdown gracefully.
+// the launcher has shutdown gracefully.
 //
 // For an example worker application look in ./apps/workers/noop/main.go.
-type Launcher struct {
+type launcher struct {
 	// will panic if not properly initialized with the NewLauncher function.
 	isInitialized bool
 
 	// isDoing indicates the launcher has already launched the task loop
 	isDoing bool
 
-	opt      *LauncherOptions
-	consumer bus.Consumer
-	producer bus.Producer
-	mke      MakeWorker // for creating new workers
-	logger   *log.Logger
+	opt          *LauncherOptions
+	consumer     bus.Consumer
+	producer     bus.Producer
+	mke          MakeWorker // for creating new workers
+	lgr          *log.Logger
+	taskType     string // registered task type; used for identifying the worker and handling task types that do not match.
+	typeHandling string // how to handle unmatching task types: one of "reject", "ignore"
 
 	// communicating launcher has finished shutting down
 	doneCtx  context.Context    // launcher context (highest level context)
@@ -298,11 +332,7 @@ type Launcher struct {
 // will not do anything. If called more than once will
 // return a copy of the same context and cancel function
 // received the first time.
-func (l *Launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFunc) {
-	if !l.isInitialized {
-		panic("launcher not correctly initialized!")
-	}
-
+func (l *launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFunc) {
 	if l.isDoing {
 		return l.doneCtx, l.stopCncl
 	}
@@ -313,7 +343,7 @@ func (l *Launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFu
 }
 
 // do is the main task loop.
-func (l *Launcher) do() {
+func (l *launcher) do() {
 	defer l.doneCncl()
 
 	for {
@@ -364,7 +394,7 @@ Shutdown:
 }
 
 // next handles getting and processing the next task.
-func (l *Launcher) next() {
+func (l *launcher) next() {
 	tskB, done, err := l.consumer.Msg()
 	if done {
 		l.lastCncl()
@@ -400,7 +430,7 @@ func (l *Launcher) next() {
 // doLaunch will safely handle the wait
 // group and cleanly close down a worker
 // and report back on the task result.
-func (l *Launcher) doLaunch(tsk *Task) {
+func (l *launcher) doLaunch(tsk *Task) {
 	defer l.giveBackSlot()
 
 	var wCtx context.Context
@@ -416,10 +446,17 @@ func (l *Launcher) doLaunch(tsk *Task) {
 	tsk.Start()
 	defer l.sendTsk(tsk)
 
-	// check task type (if EnforcedTaskType specified)
-	if l.opt.EnforcedTaskType != "" && l.opt.EnforcedTaskType != tsk.Type {
-		msg := fmt.Sprintf("unexpected task type '%v' wanting '%v'", tsk.Type, l.opt.EnforcedTaskType)
+	// typeHandling: 'reject'
+	if l.typeHandling == "reject" {
+		msg := fmt.Sprintf("unexpected task type '%v' wanting '%v'", tsk.Type, l.taskType)
 		tsk.End(ErrResult, msg)
+		return
+	}
+
+	// typeHandling: 'ignore'
+	if l.typeHandling == "ignore" {
+		// do nothing, the task is not returned and a worker
+		// is not created.
 		return
 	}
 
@@ -453,7 +490,7 @@ func (l *Launcher) doLaunch(tsk *Task) {
 	return
 }
 
-func (l *Launcher) sendTsk(tsk *Task) {
+func (l *launcher) sendTsk(tsk *Task) {
 	l.producer.Send(l.opt.DoneTopic, tsk.JSONBytes())
 }
 
@@ -463,7 +500,7 @@ func (l *Launcher) sendTsk(tsk *Task) {
 //
 // will not give back the slot if the application is
 // shutting down or processing the last task.
-func (l *Launcher) giveBackSlot() {
+func (l *launcher) giveBackSlot() {
 	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
 		l.slots <- 1
 	}
@@ -471,8 +508,8 @@ func (l *Launcher) giveBackSlot() {
 }
 
 // log is the central point of operational logging.
-func (l *Launcher) log(msg string) {
-	l.logger.Println(msg)
+func (l *launcher) log(msg string) {
+	l.lgr.Println(msg)
 }
 
 // Err can be called after the launcher has
@@ -481,7 +518,7 @@ func (l *Launcher) log(msg string) {
 // If it's called before shutdown then will return
 // nil. Will return the same error on subsequent
 // calls.
-func (l *Launcher) Err() error {
+func (l *launcher) Err() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.doneCtx.Err() != nil {
