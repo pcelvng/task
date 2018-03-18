@@ -8,20 +8,20 @@ import (
 )
 
 func main() {
-	l, _ := task.NewLauncher(MakeWorker, nil, nil)
+	l, _ := task.NewLauncher(newWorker, nil, nil)
 	ctx, _ := l.DoTasks()
 	<-ctx.Done()
 }
 
-func MakeWorker(info string) task.Worker {
-	return &HelloWorldWorker{info}
+func newWorker(info string) task.Worker {
+	return &helloWorldWorker{info}
 }
 
-type HelloWorldWorker struct {
+type helloWorldWorker struct {
 	info string
 }
 
-func (w *HelloWorldWorker) DoTask(_ context.Context) (task.Result, string) {
+func (w *helloWorldWorker) DoTask(_ context.Context) (task.Result, string) {
 	log.Println(w.info)
 	return task.CompleteResult, "task complete!"
 }

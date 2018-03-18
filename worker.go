@@ -5,14 +5,14 @@ import (
 	"fmt"
 )
 
+// NewWorker is a worker initializer called by the Launcher to
+// generate a new worker for a new task.
+type NewWorker func(info string) Worker
+
 type Worker interface {
 	// DoTask will return a Result and msg string.
 	DoTask(context.Context) (Result, string)
 }
-
-// MakeWorker is called by the Launcher to
-// generate a new worker for a new task.
-type MakeWorker func(info string) Worker
 
 // IsDone is a helper function that determines if ctx has been canceled
 func IsDone(ctx context.Context) bool {

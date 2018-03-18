@@ -100,7 +100,7 @@ type LauncherOptions struct {
 }
 
 // NewLauncher creates a new Launcher.
-func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Launcher, error) {
+func NewLauncher(newWkr NewWorker, opt *LauncherOptions, bOpt *bus.Options) (*Launcher, error) {
 	if opt == nil {
 		opt = NewLauncherOptions("")
 	}
@@ -121,7 +121,7 @@ func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Laun
 		return nil, err
 	}
 
-	return NewLauncherFromBus(mkr, c, p, opt), nil
+	return NewLauncherFromBus(newWkr, c, p, opt), nil
 }
 
 // NewLauncherFromBus returns a Launcher from the provided
@@ -129,7 +129,7 @@ func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Laun
 //
 // Usually not necessary to use directly unless the caller
 // is providing a non-standard library consumer, producer buses.
-func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *Launcher {
+func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *Launcher {
 	// Launcher options
 	if opt == nil {
 		opt = NewLauncherOptions("")
@@ -214,7 +214,7 @@ func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Lau
 		consumer:      c,
 		producer:      p,
 		opt:           opt,
-		mke:           mke,
+		newWkr:        newWkr,
 		lgr:           opt.Logger,
 		taskType:      opt.TaskType,
 		typeHandling:  typeHandling,
@@ -252,7 +252,7 @@ type Launcher struct {
 	opt          *LauncherOptions
 	consumer     bus.Consumer
 	producer     bus.Producer
-	mke          MakeWorker // for creating new workers
+	newWkr       NewWorker // initializing workers
 	lgr          *log.Logger
 	taskType     string // registered task type; used for identifying the worker and handling task types that do not match.
 	typeHandling string // how to handle unmatching task types: one of "reject", "ignore"
@@ -464,7 +464,7 @@ func (l *Launcher) doLaunch(tsk *Task) {
 		return
 	}
 
-	worker := l.mke(tsk.Info)
+	worker := l.newWkr(tsk.Info)
 	doneChan := make(chan interface{})
 	go func() {
 		result, msg := worker.DoTask(wCtx)
