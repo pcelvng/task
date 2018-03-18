@@ -10,7 +10,7 @@ type Worker interface {
 	DoTask(context.Context) (Result, string)
 }
 
-// MakeWorker is called by the Launcher to
+// MakeWorker is called by the launcher to
 // generate a new worker for a new task.
 type MakeWorker func(info string) Worker
 

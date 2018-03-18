@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	l, _ := task.NewLauncher(MakeWorker, nil, nil)
+	l, _ := task.Launcher(MakeWorker, nil, nil)
 	ctx, _ := l.DoTasks()
 	<-ctx.Done()
 }
