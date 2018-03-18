@@ -56,18 +56,18 @@ func NewLauncherOptions(tskType string) *LauncherOptions {
 }
 
 // LauncherOptions contains the options for initializing a
-// new launcher. The default values will likely work for most cases.
+// new Launcher. The default values will likely work for most cases.
 type LauncherOptions struct {
 	// MaxInProgress is the max number tasks
 	// in progress at one time.
 	MaxInProgress uint `toml:"max_in_progress" commented:"true"`
 
-	// WorkerKillTime is how long the launcher will
+	// WorkerKillTime is how long the Launcher will
 	// wait for a forced-shutdown worker to cleanup.
 	WorkerKillTime time.Duration `toml:"worker_kill_time" commented:"true"`
 
 	// LifetimeWorkers - maximum number of tasks the
-	// launcher will process before closing.
+	// Launcher will process before closing.
 	//
 	// The default value of 0 means there is no limit.
 	LifetimeWorkers uint `toml:"lifetime_workers" commented:"true"`
@@ -82,16 +82,16 @@ type LauncherOptions struct {
 	TaskType string `toml:"-"`
 
 	// RejectBadType will reject all task types that are not registered
-	// with the launcher with RegisterType.
+	// with the Launcher with RegisterType.
 	//
-	// Note that if both RejectBadType and IgnoreBadType are true then the launcher will
+	// Note that if both RejectBadType and IgnoreBadType are true then the Launcher will
 	// act as if only RejectBadType were true.
 	RejectBadType bool `toml:"reject_bad_type" commented:'true' comment:"if true then unregistered task types are returned to the bus with an 'error' result and no worker is launched"`
 
 	// RejectBadType will reject all task types that are not registered
-	// with the launcher with RegisterType.
+	// with the Launcher with RegisterType.
 	//
-	// Note that if both RejectBadType and IgnoreBadType are true then the launcher will
+	// Note that if both RejectBadType and IgnoreBadType are true then the Launcher will
 	// act as if only RejectBadType were true.
 	IgnoreBadType bool `toml:"ignore_bad_type" commented:'true' comment:"if true then unregistered task types are ignored and no worker is launched`
 
@@ -99,8 +99,8 @@ type LauncherOptions struct {
 	Logger *log.Logger `toml:"-"`
 }
 
-// Launcher creates a new launcher.
-func Launcher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*launcher, error) {
+// NewLauncher creates a new Launcher.
+func NewLauncher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*Launcher, error) {
 	if opt == nil {
 		opt = NewLauncherOptions("")
 	}
@@ -121,16 +121,16 @@ func Launcher(mkr MakeWorker, opt *LauncherOptions, bOpt *bus.Options) (*launche
 		return nil, err
 	}
 
-	return LauncherFromBus(mkr, c, p, opt), nil
+	return NewLauncherFromBus(mkr, c, p, opt), nil
 }
 
-// NewLauncherFromBus returns a launcher from the provided
+// NewLauncherFromBus returns a Launcher from the provided
 // consumer and producer buses.
 //
 // Usually not necessary to use directly unless the caller
 // is providing a non-standard library consumer, producer buses.
-func LauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *launcher {
-	// launcher options
+func NewLauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *Launcher {
+	// Launcher options
 	if opt == nil {
 		opt = NewLauncherOptions("")
 	}
@@ -165,18 +165,18 @@ func LauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Launch
 	remaining := opt.LifetimeWorkers
 
 	// doneCncl (done cancel function)
-	// - is called internally by the launcher to signal that the launcher
+	// - is called internally by the Launcher to signal that the Launcher
 	// has COMPLETED shutting down.
 	//
 	// doneCtx (done context)
-	// - is for communicating externally that the launcher is DONE and
+	// - is for communicating externally that the Launcher is DONE and
 	// has shutdown gracefully.
 	doneCtx, doneCncl := context.WithCancel(context.Background())
 
-	// stop context and cancel func: shutdown launcher/workers
+	// stop context and cancel func: shutdown Launcher/workers
 	//
-	// stopCtx - launcher will listen on stopCtx.Done() for external forced shutdown.
-	// stopCncl - used externally of launcher to initiate forced launcher shutdown.
+	// stopCtx - Launcher will listen on stopCtx.Done() for external forced shutdown.
+	// stopCncl - used externally of Launcher to initiate forced Launcher shutdown.
 	stopCtx, stopCncl := context.WithCancel(context.Background())
 
 	// last context and cancel func - for indicating the last task
@@ -209,7 +209,7 @@ func LauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Launch
 		lgr.Printf("NO WORKERS WILL BE LAUNCHED! task type handling is set to '%v' but no task type is provided", typeHandling)
 	}
 
-	return &launcher{
+	return &Launcher{
 		isInitialized: true,
 		consumer:      c,
 		producer:      p,
@@ -231,22 +231,22 @@ func LauncherFromBus(mke MakeWorker, c bus.Consumer, p bus.Producer, opt *Launch
 	}
 }
 
-// launcher handles the heavy lifting of worker lifecycle, general
+// Launcher handles the heavy lifting of worker lifecycle, general
 // task management and interacting with the bus.
 //
 // The calling routine should listen on context.Done to know if
-// the launcher has shut itself down.
+// the Launcher has shut itself down.
 //
-// The calling routine can force the launcher to shutdown by calling
+// The calling routine can force the Launcher to shutdown by calling
 // the cancelFunc and then listening on context.Done to know when
-// the launcher has shutdown gracefully.
+// the Launcher has shutdown gracefully.
 //
 // For an example worker application look in ./apps/workers/noop/main.go.
-type launcher struct {
+type Launcher struct {
 	// will panic if not properly initialized with the NewLauncher function.
 	isInitialized bool
 
-	// isDoing indicates the launcher has already launched the task loop
+	// isDoing indicates the Launcher has already launched the task loop
 	isDoing bool
 
 	opt          *LauncherOptions
@@ -257,27 +257,27 @@ type launcher struct {
 	taskType     string // registered task type; used for identifying the worker and handling task types that do not match.
 	typeHandling string // how to handle unmatching task types: one of "reject", "ignore"
 
-	// communicating launcher has finished shutting down
-	doneCtx  context.Context    // launcher context (highest level context)
-	doneCncl context.CancelFunc // launcher cancel func (calling it indicates the launcher has cleanly closed up)
+	// communicating Launcher has finished shutting down
+	doneCtx  context.Context    // Launcher context (highest level context)
+	doneCncl context.CancelFunc // Launcher cancel func (calling it indicates the Launcher has cleanly closed up)
 
-	// forcing workers/launcher to shut down
+	// forcing workers/Launcher to shut down
 	// all worker contexts inherit from stopCtx.
-	stopCtx  context.Context    // for listening to launcher shutdown signal. Initiates shutdown process.
-	stopCncl context.CancelFunc // for telling the launcher to shutdown. Initiates shutdown process. Shutdown is complete when doneCtx.Done() is closed
+	stopCtx  context.Context    // for listening to Launcher shutdown signal. Initiates shutdown process.
+	stopCncl context.CancelFunc // for telling the Launcher to shutdown. Initiates shutdown process. Shutdown is complete when doneCtx.Done() is closed
 
 	// indicate the last task is in progress
 	lastCtx  context.Context    // main loop will listen on lastCtx.Done() to know if the last task is in progress
 	lastCncl context.CancelFunc // called to indicate the last task is in progress
 
-	// closeTimeout tells the launcher how long to wait
+	// closeTimeout tells the Launcher how long to wait
 	// when forcing a task to close.
 	closeTimeout time.Duration
 
 	// completeTimeout for forcing a task to complete within a
 	// certain amount of time or force it to close.
 	// if value is not set then this feature is disabled
-	// and the launcher will wait indefinitely for a task
+	// and the Launcher will wait indefinitely for a task
 	// to complete.
 	//
 	// if the completeTimeout is reached then the task is forced
@@ -291,7 +291,7 @@ type launcher struct {
 	wg sync.WaitGroup
 
 	// maxInProgress describes the maximum number of tasks
-	// that the launcher will allow at one
+	// that the Launcher will allow at one
 	// time.
 	//
 	// A value of 0 is set to 1. Will always have a value of at
@@ -301,7 +301,7 @@ type launcher struct {
 	// remaining is decremented every time a new task
 	// is requested. When remaining reaches 0 the task
 	// requested is marked as the last and when it finishes
-	// the launcher will shutdown.
+	// the Launcher will shutdown.
 	//
 	// An initial value of 0 means there is no lifetime limit.
 	remaining uint
@@ -322,8 +322,8 @@ type launcher struct {
 // DoTasks will start the task loop and immediately
 // begin working on tasks if any are available.
 //
-// The launcher assumes the producer and consumer
-// are fully initialized when the launcher is created.
+// The Launcher assumes the producer and consumer
+// are fully initialized when the Launcher is created.
 //
 // Will panic if not initialized with either NewLauncher
 // or NewCPLauncher.
@@ -332,7 +332,11 @@ type launcher struct {
 // will not do anything. If called more than once will
 // return a copy of the same context and cancel function
 // received the first time.
-func (l *launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFunc) {
+func (l *Launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFunc) {
+	if !l.isInitialized {
+		panic("launcher not initialized")
+	}
+
 	if l.isDoing {
 		return l.doneCtx, l.stopCncl
 	}
@@ -343,7 +347,7 @@ func (l *launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFu
 }
 
 // do is the main task loop.
-func (l *launcher) do() {
+func (l *Launcher) do() {
 	defer l.doneCncl()
 
 	for {
@@ -394,7 +398,7 @@ Shutdown:
 }
 
 // next handles getting and processing the next task.
-func (l *launcher) next() {
+func (l *Launcher) next() {
 	tskB, done, err := l.consumer.Msg()
 	if done {
 		l.lastCncl()
@@ -430,7 +434,7 @@ func (l *launcher) next() {
 // doLaunch will safely handle the wait
 // group and cleanly close down a worker
 // and report back on the task result.
-func (l *launcher) doLaunch(tsk *Task) {
+func (l *Launcher) doLaunch(tsk *Task) {
 	defer l.giveBackSlot()
 
 	var wCtx context.Context
@@ -490,7 +494,7 @@ func (l *launcher) doLaunch(tsk *Task) {
 	return
 }
 
-func (l *launcher) sendTsk(tsk *Task) {
+func (l *Launcher) sendTsk(tsk *Task) {
 	l.producer.Send(l.opt.DoneTopic, tsk.JSONBytes())
 }
 
@@ -500,7 +504,7 @@ func (l *launcher) sendTsk(tsk *Task) {
 //
 // will not give back the slot if the application is
 // shutting down or processing the last task.
-func (l *launcher) giveBackSlot() {
+func (l *Launcher) giveBackSlot() {
 	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
 		l.slots <- 1
 	}
@@ -508,17 +512,17 @@ func (l *launcher) giveBackSlot() {
 }
 
 // log is the central point of operational logging.
-func (l *launcher) log(msg string) {
+func (l *Launcher) log(msg string) {
 	l.lgr.Println(msg)
 }
 
-// Err can be called after the launcher has
+// Err can be called after the Launcher has
 // communicated it has finished shutting down.
 //
 // If it's called before shutdown then will return
 // nil. Will return the same error on subsequent
 // calls.
-func (l *launcher) Err() error {
+func (l *Launcher) Err() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.doneCtx.Err() != nil {
