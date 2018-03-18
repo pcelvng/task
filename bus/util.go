@@ -39,17 +39,17 @@ type Options struct {
 	// - "file"
 	// - "nsq"
 	// - "nop" - no-operation bus for testing
-	Bus    string `toml:"bus"`
-	InBus  string `toml:"in_bus"`  // to have a different consumer and producer
-	OutBus string `toml:"out_bus"` // to have a different consumer and producer
+	Bus    string `toml:"bus" comment:"task message bus (nsq, file, stdio)"`
+	InBus  string `toml:"in_bus" omitempty`  // to have a different consumer and producer
+	OutBus string `toml:"out_bus" omitempty` // to have a different consumer and producer
 
 	// consumer topic and channel
-	InTopic   string `toml:"in_topic"`   // required for consumers
-	InChannel string `toml:"in_channel"` // required for consumers
+	InTopic   string `toml:"in_topic" commented:"true"`   // required for consumers
+	InChannel string `toml:"in_channel" commented:"true"` // required for consumers
 
 	// for "nsq" bus type
-	NSQdHosts    []string `toml:"nsqd_hosts"`    // nsq producer or consumer
-	LookupdHosts []string `toml:"lookupd_hosts"` // nsq consumer only
+	NSQdHosts    []string `toml:"nsqd_hosts" commented:"true"`    // nsq producer or consumer
+	LookupdHosts []string `toml:"lookupd_hosts" commented:"true"` // nsq consumer only
 
 	// NopMock for "nop" bus type,
 	// Can be set in order to
