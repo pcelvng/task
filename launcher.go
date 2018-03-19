@@ -60,21 +60,19 @@ func NewLauncherOptions(tskType string) *LauncherOptions {
 type LauncherOptions struct {
 	// MaxInProgress is the max number tasks
 	// in progress at one time.
-	MaxInProgress uint `toml:"max_in_progress" commented:"true"`
+	MaxInProgress uint `toml:"max_in_progress" commented:"true" comment:"maximum number of workers within the application at one time"`
 
 	// WorkerKillTime is how long the Launcher will
 	// wait for a forced-shutdown worker to cleanup.
-	WorkerKillTime time.Duration `toml:"worker_kill_time" commented:"true"`
+	WorkerKillTime time.Duration `toml:"worker_kill_time" commented:"true" comment:"how long the application will wait for a task to finish before shutting down when being forced to shut down"`
 
 	// LifetimeWorkers - maximum number of tasks the
 	// Launcher will process before closing.
-	//
-	// The default value of 0 means there is no limit.
-	LifetimeWorkers uint `toml:"lifetime_workers" commented:"true"`
+	LifetimeWorkers uint `toml:"lifetime_workers" commented:"true" comment:"maximum number of workers that will be launched before the application shuts down; a value of 0 means no limit"`
 
 	// DoneTopic - topic to publish to for done tasks.
 	// Default: "done"
-	DoneTopic string `toml:"done_topic" commented:"true"`
+	DoneTopic string `toml:"done_topic" commented:"true" comment:"topic on which to send done tasks (error and complete results)"`
 
 	// TaskType is highly encouraged to be provided. The task type is important for worker discovery and necessary
 	// for expected functioning of the RejectBadType and IgnoreBadType options.
@@ -86,14 +84,14 @@ type LauncherOptions struct {
 	//
 	// Note that if both RejectBadType and IgnoreBadType are true then the Launcher will
 	// act as if only RejectBadType were true.
-	RejectBadType bool `toml:"reject_bad_type" commented:'true' comment:"if true then unregistered task types are returned to the bus with an 'error' result and no worker is launched"`
+	RejectBadType bool `toml:"reject_bad_type" commented:"true" comment:"if true then unregistered task types are returned to the bus with an 'error' result and no worker is launched"`
 
 	// RejectBadType will reject all task types that are not registered
 	// with the Launcher with RegisterType.
 	//
 	// Note that if both RejectBadType and IgnoreBadType are true then the Launcher will
 	// act as if only RejectBadType were true.
-	IgnoreBadType bool `toml:"ignore_bad_type" commented:'true' comment:"if true then unregistered task types are ignored and no worker is launched`
+	IgnoreBadType bool `toml:"ignore_bad_type" commented:"true" comment:"if true then unregistered task types are ignored and no worker is launched"`
 
 	// custom logger option
 	Logger *log.Logger `toml:"-"`
