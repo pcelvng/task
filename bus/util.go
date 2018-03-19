@@ -40,12 +40,12 @@ type Options struct {
 	// - "nsq"
 	// - "nop" - no-operation bus for testing
 	Bus    string `toml:"bus" comment:"task message bus (nsq, file, stdio)"`
-	InBus  string `toml:"in_bus" omitempty`  // to have a different consumer and producer
-	OutBus string `toml:"out_bus" omitempty` // to have a different consumer and producer
+	InBus  string `toml:"in_bus" commented:"true" comment:"set a different consumer bus type than producer" (nsq, file, stdin)`
+	OutBus string `toml:"out_bus" commented:"true" comment:"set a different producer bus type than consumer (nsq, file, stdout, stderr, null)"`
 
 	// consumer topic and channel
-	InTopic   string `toml:"in_topic" commented:"true"`   // required for consumers
-	InChannel string `toml:"in_channel" commented:"true"` // required for consumers
+	InTopic   string `toml:"in_topic" commented:"true" comment:"for file bus in_topic is a file name"`
+	InChannel string `toml:"in_channel" commented:"true"`
 
 	// for "nsq" bus type
 	NSQdHosts    []string `toml:"nsqd_hosts" commented:"true"`    // nsq producer or consumer
