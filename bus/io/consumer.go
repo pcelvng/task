@@ -66,13 +66,20 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	c.Lock()
 	defer c.Unlock()
 
-	if c.scanner.Scan() {
-		msg = c.scanner.Bytes()
-	} else {
-		err = c.scanner.Err()
-		if err == nil {
+	scanChan := make(chan interface{})
+	go func() {
+		if c.scanner.Scan() {
+			msg = c.scanner.Bytes()
+		} else {
 			done = true
 		}
+
+		close(scanChan)
+	}()
+
+	select {
+	case <-scanChan:
+	case <-c.ctx.Done():
 	}
 
 	return msg, done, err
