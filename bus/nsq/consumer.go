@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	gonsq "github.com/bitly/go-nsq"
 )
@@ -19,6 +20,12 @@ func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
 	// create nsq consumer config
 	nsqConf := gonsq.NewConfig()
 	nsqConf.MaxInFlight = maxInFlight
+	//nsqConf.MaxAttempts = 65535
+	nsqConf.MaxAttempts = 0 // unlimited attempts
+	nsqConf.BackoffMultiplier = 0
+	nsqConf.MaxBackoffDuration = 0
+	nsqConf.DefaultRequeueDelay = time.Second * 2
+	nsqConf.MaxRequeueDelay = time.Second * 6
 
 	// create context for clean shutdown
 	ctx, cncl := context.WithCancel(context.Background())
