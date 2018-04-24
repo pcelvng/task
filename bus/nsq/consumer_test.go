@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	gonsq "github.com/bitly/go-nsq"
+	gonsq "github.com/nsqio/go-nsq"
 )
 
 // TestMain will setup nsqd and lookupd. It expects those two binaries

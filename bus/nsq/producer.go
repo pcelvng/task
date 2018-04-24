@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/bitly/go-hostpool"
-	gonsq "github.com/bitly/go-nsq"
+	gonsq "github.com/nsqio/go-nsq"
 )
 
 func NewProducer(opt *Option) (*Producer, error) {
