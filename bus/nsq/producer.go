@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/nsqio/go-hostpool"
+	"github.com/bitly/go-hostpool"
 	gonsq "github.com/nsqio/go-nsq"
 )
 
