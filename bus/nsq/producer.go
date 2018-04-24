@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/bitly/go-hostpool"
-	gonsq "github.com/bitly/go-nsq"
+	"github.com/nsqio/go-hostpool"
+	gonsq "github.com/nsqio/go-nsq"
 )
 
 func NewProducer(opt *Option) (*Producer, error) {

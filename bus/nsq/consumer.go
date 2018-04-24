@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	gonsq "github.com/bitly/go-nsq"
+	gonsq "github.com/nsqio/go-nsq"
 )
 
 func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {

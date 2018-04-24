@@ -3,7 +3,7 @@ package nsq
 import (
 	"log"
 
-	gonsq "github.com/bitly/go-nsq"
+	gonsq "github.com/nsqio/go-nsq"
 )
 
 // Option is used for instantiating an NSQ Consumer or
