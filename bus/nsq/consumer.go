@@ -26,7 +26,7 @@ func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
 	nsqConf.MaxBackoffDuration = 0
 	nsqConf.DefaultRequeueDelay = time.Second * 2
 	nsqConf.MaxRequeueDelay = time.Second * 6
-	nsqConf.RDYRedistributeInterval = time.Millisecond
+	nsqConf.RDYRedistributeInterval = time.Millisecond * 100
 
 	// create context for clean shutdown
 	ctx, cncl := context.WithCancel(context.Background())
