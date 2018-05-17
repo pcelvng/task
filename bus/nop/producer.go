@@ -1,6 +1,9 @@
 package nop
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // NewProducer returns a nop (no-operation) Producer.
 // Will return *Producer == nil and err != nil
@@ -10,7 +13,10 @@ func NewProducer(mock string) (*Producer, error) {
 		return nil, errors.New(mock)
 	}
 
-	return &Producer{mock}, nil
+	return &Producer{
+		Mock:     mock,
+		Messages: make(map[string][]string, 0),
+	}, nil
 }
 
 // Producer is a no-operation consumer. It
@@ -24,13 +30,15 @@ type Producer struct {
 	// - "err" - every method returns an error
 	// - "send_err" - returns err when Producer.Send() is called.
 	// - "stop_err" - returns err on Stop() method call
-	Mock string
+	Mock     string
+	Messages map[string][]string // [topic]Messages
 }
 
 func (p *Producer) Send(topic string, msg []byte) error {
 	if p.Mock == "send_err" {
 		return errors.New(p.Mock)
 	}
+	p.Messages[topic] = append(p.Messages[topic], string(msg))
 	return nil
 }
 
@@ -40,4 +48,13 @@ func (p *Producer) Stop() error {
 		return errors.New(p.Mock)
 	}
 	return nil
+}
+
+func (p *Producer) Contains(topic string, msg []byte) bool {
+	for _, m := range p.Messages[topic] {
+		if strings.Contains(m, string(msg)) {
+			return true
+		}
+	}
+	return false
 }
