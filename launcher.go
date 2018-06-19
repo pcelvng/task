@@ -5,10 +5,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/gin-gonic/gin/json"
 	"github.com/pcelvng/task/bus"
+)
+
+const (
+	truncTime = 10 * time.Millisecond
 )
 
 var (
@@ -208,6 +215,7 @@ func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *L
 	}
 
 	return &Launcher{
+		initTime:      time.Now(),
 		isInitialized: true,
 		consumer:      c,
 		producer:      p,
@@ -315,6 +323,40 @@ type Launcher struct {
 	// shutdown is complete.
 	closeErr error
 	mu       sync.Mutex // managing safe access to closeErr
+
+	totalTasks  int64
+	activeTasks int64
+	initTime    time.Time
+	taskRunTime uint64 // a sum of all task run times (end - start)/ 100 * time.millisecond
+}
+
+func (l *Launcher) Status() []byte {
+
+	runtime := atomic.LoadUint64(&l.taskRunTime)
+	totalTasks := atomic.LoadInt64(&l.totalTasks)
+	activeTasks := atomic.LoadInt64(&l.activeTasks)
+	finishedTasks := totalTasks - activeTasks
+	resp := struct {
+		Uptime          string
+		TasksRun        int64
+		ActiveTasks     int64
+		Bus             map[string]string `json:"bus"`
+		AverageTaskTime string            `json:",omitempty"`
+	}{
+		Uptime:      time.Now().Sub(l.initTime).String(),
+		TasksRun:    l.totalTasks,
+		ActiveTasks: l.activeTasks,
+		Bus: map[string]string{
+			"producer": reflect.TypeOf(l.producer).String(),
+			"consumer": reflect.TypeOf(l.consumer).String()},
+	}
+
+	if finishedTasks > 0 {
+		resp.AverageTaskTime = (time.Duration(runtime) / time.Duration(finishedTasks) * truncTime).String()
+	}
+
+	b, _ := json.Marshal(resp)
+	return b
 }
 
 // DoTasks will start the task loop and immediately
@@ -347,7 +389,6 @@ func (l *Launcher) DoTasks() (doneCtx context.Context, stopCncl context.CancelFu
 // do is the main task loop.
 func (l *Launcher) do() {
 	defer l.doneCncl()
-
 	for {
 		select {
 		case <-l.stopCtx.Done():
@@ -356,6 +397,8 @@ func (l *Launcher) do() {
 			goto Shutdown
 		case <-l.slots:
 			l.wg.Add(1)
+			atomic.AddInt64(&l.activeTasks, 1)
+			atomic.AddInt64(&l.totalTasks, 1)
 			l.mu.Lock()
 			if l.remaining != 0 {
 				if l.remaining > 0 {
@@ -467,6 +510,8 @@ func (l *Launcher) doLaunch(tsk *Task) {
 	go func() {
 		result, msg := worker.DoTask(wCtx)
 		tsk.End(result, msg)
+		execTime := tsk.ended.Sub(tsk.started) / truncTime
+		atomic.AddUint64(&l.taskRunTime, uint64(execTime))
 		close(doneChan)
 	}()
 
@@ -504,6 +549,7 @@ func (l *Launcher) sendTsk(tsk *Task) {
 // shutting down or processing the last task.
 func (l *Launcher) giveBackSlot() {
 	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
+		atomic.AddInt64(&l.activeTasks, -1)
 		l.slots <- 1
 	}
 	l.wg.Done()

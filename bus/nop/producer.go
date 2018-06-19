@@ -3,6 +3,7 @@ package nop
 import (
 	"errors"
 	"strings"
+	"sync"
 )
 
 // NewProducer returns a nop (no-operation) Producer.
@@ -32,13 +33,16 @@ type Producer struct {
 	// - "stop_err" - returns err on Stop() method call
 	Mock     string
 	Messages map[string][]string // [topic]Messages
+	mu       sync.Mutex
 }
 
 func (p *Producer) Send(topic string, msg []byte) error {
 	if p.Mock == "send_err" {
 		return errors.New(p.Mock)
 	}
+	p.mu.Lock()
 	p.Messages[topic] = append(p.Messages[topic], string(msg))
+	p.mu.Unlock()
 	return nil
 }
 
