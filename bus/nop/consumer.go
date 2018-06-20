@@ -1,6 +1,10 @@
 package nop
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/pcelvng/task/bus/info"
+)
 
 // FakeMsg can be set to control the returned
 // Msg() msg value.
@@ -14,7 +18,7 @@ func NewConsumer(mock string) (*Consumer, error) {
 		return nil, errors.New(mock)
 	}
 
-	return &Consumer{mock}, nil
+	return &Consumer{Mock: mock, info: info.Consumer{Bus: "nop"}}, nil
 }
 
 // Consumer is a no-operation consumer. It
@@ -31,6 +35,7 @@ type Consumer struct {
 	// - "msg_msg_done" - returns a non-nil task message and done=true Consumer.Msg() call.
 	// - "stop_err" - returns err on Stop() method call
 	Mock string
+	info info.Consumer
 }
 
 // Msg will always return a fake task message unless err != nil
@@ -51,6 +56,10 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	// set fake msg
 	msg = FakeMsg
 	return msg, done, err
+}
+
+func (c *Consumer) Info() info.Consumer {
+	return c.info
 }
 
 // Stop is a mock consumer Stop method.

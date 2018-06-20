@@ -4,22 +4,44 @@ import (
 	"errors"
 	"os"
 	"sync"
+
+	"github.com/pcelvng/task/bus/info"
 )
 
 func NewStdoutProducer() *Producer {
-	return &Producer{isStdout: true}
+	return &Producer{
+		isStdout: true,
+		info: info.Producer{
+			Bus:  "stdout",
+			Sent: make(map[string]int),
+		},
+	}
 }
 
 func NewNullProducer() *Producer {
-	return &Producer{isNull: true}
+	return &Producer{
+		isNull: true,
+		info: info.Producer{
+			Bus:  "null",
+			Sent: make(map[string]int),
+		},
+	}
 }
 
 func NewStdErrProducer() *Producer {
-	return &Producer{isStderr: true}
+	return &Producer{
+		isStderr: true,
+		info: info.Producer{
+			Bus:  "stderr",
+			Sent: make(map[string]int),
+		},
+	}
 }
 
 func NewProducer() *Producer {
-	return &Producer{}
+	return &Producer{
+		info: info.Producer{Sent: make(map[string]int)},
+	}
 }
 
 type Producer struct {
@@ -27,6 +49,7 @@ type Producer struct {
 	isNull   bool
 	isStderr bool
 	mu       sync.Mutex
+	info     info.Producer
 }
 
 // Send takes a topic and the message to send. The topic is
@@ -63,9 +86,14 @@ func (p *Producer) Send(topic string, msg []byte) error {
 	if err != nil {
 		return err
 	}
+	p.info.Sent[topic]++
 	_, err = f.Write(msg)
 	f.Close()
 	return err
+}
+
+func (p *Producer) Info() info.Producer {
+	return p.info
 }
 
 func (p *Producer) Stop() error {

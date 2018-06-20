@@ -40,7 +40,7 @@ type Options struct {
 	// - "nsq"
 	// - "nop" - no-operation bus for testing
 	Bus    string `toml:"bus" comment:"task message bus (nsq, file, stdio)"`
-	InBus  string `toml:"in_bus" commented:"true" comment:"set a different consumer bus type than producer" (nsq, file, stdin)`
+	InBus  string `toml:"in_bus" commented:"true" comment:"set a different consumer bus type than producer (nsq, file, stdin)"`
 	OutBus string `toml:"out_bus" commented:"true" comment:"set a different producer bus type than consumer (nsq, file, stdout, stderr, null)"`
 
 	// consumer topic and channel

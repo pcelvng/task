@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"sync"
+
+	"github.com/pcelvng/task/bus/info"
 )
 
 // NewProducer returns a nop (no-operation) Producer.
@@ -17,6 +19,7 @@ func NewProducer(mock string) (*Producer, error) {
 	return &Producer{
 		Mock:     mock,
 		Messages: make(map[string][]string, 0),
+		info:     info.Producer{Bus: "mock", Sent: make(map[string]int)},
 	}, nil
 }
 
@@ -33,6 +36,7 @@ type Producer struct {
 	// - "stop_err" - returns err on Stop() method call
 	Mock     string
 	Messages map[string][]string // [topic]Messages
+	info     info.Producer
 	mu       sync.Mutex
 }
 
@@ -41,9 +45,14 @@ func (p *Producer) Send(topic string, msg []byte) error {
 		return errors.New(p.Mock)
 	}
 	p.mu.Lock()
+	p.info.Sent[topic]++
 	p.Messages[topic] = append(p.Messages[topic], string(msg))
 	p.mu.Unlock()
 	return nil
+}
+
+func (c *Producer) Info() info.Producer {
+	return info.Producer{}
 }
 
 // Stop is a mock producer Stop method.

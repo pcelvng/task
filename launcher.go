@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/gin-gonic/gin/json"
 	"github.com/pcelvng/task/bus"
+	"github.com/pcelvng/task/bus/info"
 )
 
 const (
@@ -324,39 +323,38 @@ type Launcher struct {
 	closeErr error
 	mu       sync.Mutex // managing safe access to closeErr
 
-	totalTasks  int64
-	activeTasks int64
-	initTime    time.Time
-	taskRunTime uint64 // a sum of all task run times (end - start)/ 100 * time.millisecond
+	tasksConsumed int64
+	tasksRunning  int64
+	initTime      time.Time
+	taskRunTime   uint64 // a sum of all task run times (end - start)/ 100 * time.millisecond
 }
 
-func (l *Launcher) Status() []byte {
+type LauncherStats struct {
+	RunTime       string
+	TasksConsumed int64         `json:"tasks_consumed"`
+	TasksRunning  int64         `json:"tasks_running"`
+	MeanTaskTime  string        `json:"mean_tasktime,omitempty"`
+	Producer      info.Producer `json:"producer"`
+	Consumer      info.Consumer `json:"consumer"`
+}
 
+func (l *Launcher) Stats() LauncherStats {
 	runtime := atomic.LoadUint64(&l.taskRunTime)
-	totalTasks := atomic.LoadInt64(&l.totalTasks)
-	activeTasks := atomic.LoadInt64(&l.activeTasks)
-	finishedTasks := totalTasks - activeTasks
-	resp := struct {
-		Uptime          string
-		TasksRun        int64
-		ActiveTasks     int64
-		Bus             map[string]string `json:"bus"`
-		AverageTaskTime string            `json:",omitempty"`
-	}{
-		Uptime:      time.Now().Sub(l.initTime).String(),
-		TasksRun:    l.totalTasks,
-		ActiveTasks: l.activeTasks,
-		Bus: map[string]string{
-			"producer": reflect.TypeOf(l.producer).String(),
-			"consumer": reflect.TypeOf(l.consumer).String()},
+	createdTasks := atomic.LoadInt64(&l.tasksConsumed)
+	activeTasks := atomic.LoadInt64(&l.tasksRunning)
+	finishedTasks := createdTasks - activeTasks
+	resp := LauncherStats{
+		RunTime:       time.Now().Sub(l.initTime).String(),
+		TasksConsumed: l.tasksConsumed,
+		TasksRunning:  l.tasksRunning,
+		Producer:      l.producer.Info(),
+		Consumer:      l.consumer.Info(),
 	}
 
 	if finishedTasks > 0 {
-		resp.AverageTaskTime = (time.Duration(runtime) / time.Duration(finishedTasks) * truncTime).String()
+		resp.MeanTaskTime = (time.Duration(runtime) / time.Duration(finishedTasks) * truncTime).String()
 	}
-
-	b, _ := json.Marshal(resp)
-	return b
+	return resp
 }
 
 // DoTasks will start the task loop and immediately
@@ -397,8 +395,8 @@ func (l *Launcher) do() {
 			goto Shutdown
 		case <-l.slots:
 			l.wg.Add(1)
-			atomic.AddInt64(&l.activeTasks, 1)
-			atomic.AddInt64(&l.totalTasks, 1)
+			atomic.AddInt64(&l.tasksRunning, 1)
+			atomic.AddInt64(&l.tasksConsumed, 1)
 			l.mu.Lock()
 			if l.remaining != 0 {
 				if l.remaining > 0 {
@@ -549,7 +547,7 @@ func (l *Launcher) sendTsk(tsk *Task) {
 // shutting down or processing the last task.
 func (l *Launcher) giveBackSlot() {
 	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
-		atomic.AddInt64(&l.activeTasks, -1)
+		atomic.AddInt64(&l.tasksRunning, -1)
 		l.slots <- 1
 	}
 	l.wg.Done()

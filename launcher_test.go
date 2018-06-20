@@ -2,7 +2,6 @@ package task
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -42,9 +41,9 @@ func TestLauncher_Status(t *testing.T) {
 	l := NewLauncherFromBus(newTestWorker, c, p, &LauncherOptions{MaxInProgress: 100})
 	l.DoTasks()
 	time.Sleep(time.Millisecond)
-	sts := string(l.Status())
-	if !strings.Contains(sts, `"ActiveTasks":100`) {
-		t.Errorf("Status should display ActiveTasks:100 %v", sts)
+	sts := l.Stats()
+	if sts.TasksRunning != 100 {
+		t.Errorf("Tasks running should be 100 !=%d", sts.TasksRunning)
 	}
 
 	// Test Average Run time - single worker
@@ -52,9 +51,9 @@ func TestLauncher_Status(t *testing.T) {
 	l = NewLauncherFromBus(newTestWorker, c, p, nil)
 	l.DoTasks()
 	time.Sleep(100 * time.Millisecond)
-	sts = string(l.Status())
-	if !strings.Contains(sts, `"AverageTaskTime":"10ms"`) {
-		t.Errorf("Status should display AverageTaskTime: 10ms %v", sts)
+	sts = l.Stats()
+	if sts.MeanTaskTime != "10ms" {
+		t.Errorf("Status should display MeanTaskTime: 10ms %v", sts.MeanTaskTime)
 	}
 
 	// Test Average Run time - multiple workers
@@ -62,9 +61,9 @@ func TestLauncher_Status(t *testing.T) {
 	l = NewLauncherFromBus(newTestWorker, c, p, &LauncherOptions{MaxInProgress: 20})
 	l.DoTasks()
 	time.Sleep(100 * time.Millisecond)
-	sts = string(l.Status())
-	if !strings.Contains(sts, `"AverageTaskTime":"10ms"`) {
-		t.Errorf("Status should display AverageTaskTime: 10ms %v", sts)
+	sts = l.Stats()
+	if sts.MeanTaskTime != "10ms" {
+		t.Errorf("Status should display MeanTaskTime: 10ms %v", sts.MeanTaskTime)
 	}
 
 }

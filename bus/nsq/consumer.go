@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gonsq "github.com/nsqio/go-nsq"
+	"github.com/pcelvng/task/bus/info"
 )
 
 func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
@@ -39,8 +40,14 @@ func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
 		msgChan:   make(chan []byte),
 		ctx:       ctx,
 		cncl:      cncl,
+		info: info.Consumer{
+			Bus:   "nsq",
+			Topic: topic,
+		},
 	}
-
+	if topic != channel {
+		c.info.Channel = channel
+	}
 	// connect to nsqd
 	err := c.connect(topic, channel)
 	if err != nil {
@@ -79,6 +86,8 @@ type Consumer struct {
 	// context for clean shutdown
 	ctx  context.Context
 	cncl context.CancelFunc
+
+	info info.Consumer
 }
 
 // connect will connect nsq. An error is returned if there
@@ -201,8 +210,7 @@ func (c *Consumer) HandleMessage(msg *gonsq.Message) error {
 func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	if c.ctx.Err() != nil {
 		// should not attempt to read if already stopped
-		done = true
-		return msg, done, nil
+		return msg, true, nil
 	}
 
 	c.reqMsg() // request message
@@ -210,13 +218,15 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	// wait for a message
 	select {
 	case msg = <-c.msgChan:
-		break
 	case <-c.ctx.Done():
 		done = true
-		break
 	}
-
+	c.info.Received++
 	return msg, done, err
+}
+
+func (c *Consumer) Info() info.Consumer {
+	return c.info
 }
 
 func (c *Consumer) Stop() error {
