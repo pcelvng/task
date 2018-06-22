@@ -84,9 +84,9 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 
 	select {
 	case <-scanChan:
+		c.info.Received++
 	case <-c.ctx.Done():
 	}
-	c.info.Received++
 
 	return msg, done, err
 }

@@ -8,6 +8,10 @@ import (
 	"github.com/pcelvng/task/bus/info"
 )
 
+const (
+	Send_err = "send_err"
+)
+
 // NewProducer returns a nop (no-operation) Producer.
 // Will return *Producer == nil and err != nil
 // if mock == "init_err".
@@ -52,7 +56,7 @@ func (p *Producer) Send(topic string, msg []byte) error {
 }
 
 func (c *Producer) Info() info.Producer {
-	return info.Producer{}
+	return c.info
 }
 
 // Stop is a mock producer Stop method.
