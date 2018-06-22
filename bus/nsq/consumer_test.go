@@ -27,6 +27,9 @@ import (
 // This did not happen in doing the same thing between two terminal
 // instances.
 func TestMain(m *testing.M) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
 	// start lookupd
 	err := StartLookupd()
 	if err != nil {
