@@ -28,7 +28,7 @@ func NewConsumer(mock string) (*Consumer, error) {
 		return nil, errors.New(mock)
 	}
 
-	return &Consumer{Mock: mock, info: info.Consumer{Bus: "nop"}}, nil
+	return &Consumer{Mock: mock, Stats: info.Consumer{Bus: "nop"}}, nil
 }
 
 // Consumer is a no-operation consumer. It
@@ -37,8 +37,8 @@ type Consumer struct {
 
 	// Mock can be for mocking Consumer
 	// see const above for supported values
-	Mock string
-	info info.Consumer
+	Mock  string
+	Stats info.Consumer
 }
 
 // Msg will always return a fake task message unless err != nil
@@ -57,13 +57,13 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	}
 
 	// set fake msg
-	c.info.Received++
+	c.Stats.Received++
 	msg = FakeMsg
 	return msg, done, err
 }
 
 func (c *Consumer) Info() info.Consumer {
-	return c.info
+	return c.Stats
 }
 
 // Stop is a mock consumer Stop method.
