@@ -9,6 +9,7 @@ import (
 
 	"github.com/bitly/go-hostpool"
 	gonsq "github.com/nsqio/go-nsq"
+	"github.com/pcelvng/task/bus/info"
 )
 
 func NewProducer(opt *Option) (*Producer, error) {
@@ -25,6 +26,7 @@ func NewProducer(opt *Option) (*Producer, error) {
 		numConns: 1,
 		ctx:      ctx,
 		cncl:     cncl,
+		info:     info.Producer{Bus: "nsq", Sent: make(map[string]int)},
 	}
 
 	// setup and test connection
@@ -49,6 +51,8 @@ type Producer struct {
 
 	ctx  context.Context
 	cncl context.CancelFunc
+
+	info info.Producer
 }
 
 // connect will connect to all the nsqds
@@ -119,7 +123,12 @@ func (p *Producer) Send(topic string, msg []byte) error {
 	r := p.hostPool.Get()
 	producer := p.producers[r.Host()]
 
+	p.info.Sent[topic]++
 	return producer.Publish(topic, msg)
+}
+
+func (p *Producer) Info() info.Producer {
+	return p.info
 }
 
 func (p *Producer) Stop() error {

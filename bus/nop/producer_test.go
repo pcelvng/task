@@ -1,97 +1,98 @@
 package nop
 
-import "fmt"
+import (
+	"testing"
 
-func ExampleNewProducer() {
-	// showing:
-	// - non-nil producer without err
+	"github.com/jbsmith7741/trial"
+	"github.com/pcelvng/task/bus/info"
+	"github.com/stretchr/testify/assert"
+)
 
-	// non-nil producer
-	// using a non-supported mock string just
-	// to demonstrate that Mock property is
-	// set correctly.
-	p, err := NewProducer("mock_string")
-	if p == nil {
-		return
+func TestNewProducer(t *testing.T) {
+	// doesn't error under normal behavior
+	c, err := NewProducer("")
+	if c == nil || err != nil {
+		t.Error("FAIL: default nop should not error")
 	}
-	fmt.Println(p.Mock) // output: mock_string
-	fmt.Println(err)    // output: <nil>
 
-	// Output:
-	// mock_string
-	// <nil>
-}
-
-func ExampleNewProducerErr() {
-	// showing:
-	// - nil producer with err
-
-	// nil producer with err
-	p, err := NewProducer("init_err")
+	// keyword:init_err should return error
+	_, err = NewProducer(Init_err)
 	if err == nil {
-		return
+		t.Error("FAIL: init_err should return error")
 	}
 
-	fmt.Println(p)           // output: <nil>
-	fmt.Println(err.Error()) // output: init_err
-
-	// Output:
-	// <nil>
-	// init_err
 }
 
-func ExampleProducer_Send() {
-	// showing:
-	// - Send method returns nil error
+func TestProducer_Send(t *testing.T) {
+	type input struct {
+		mock     string
+		messages map[string][]string
+	}
+	fn := func(args ...interface{}) (interface{}, error) {
+		in := args[0].(input)
+		p, err := NewProducer(in.mock)
+		if err != nil {
+			return nil, err
+		}
+		for topic, msgs := range in.messages {
+			for _, msg := range msgs {
+				err := p.Send(topic, []byte(msg))
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+		return p.Messages, nil
+	}
+	trial.New(fn, trial.Cases{
+		"single topic": {
+			Input: input{
+				mock:     "",
+				messages: map[string][]string{"": {"hello"}},
+			},
+			Expected: map[string][]string{"": {"hello"}},
+		},
+		"multiple topics": {
+			Input: input{
+				mock:     "",
+				messages: map[string][]string{"a": {"hello"}, "b": {"world"}},
+			},
+			Expected: map[string][]string{"a": {"hello"}, "b": {"world"}},
+		},
+		"keyword: send_err": {
+			Input: input{
+				mock:     Send_err,
+				messages: map[string][]string{"": {"hello"}},
+			},
+			ShouldErr: true,
+		},
+	}).Test(t)
+}
 
+func TestProducer_Info(t *testing.T) {
 	p, _ := NewProducer("")
-	if p == nil {
-		return
+	for i := 0; i < 5; i++ {
+		p.Send("a", []byte{byte(i)})
 	}
-	fmt.Println(p.Send("test-topic", []byte("test-msg"))) // output: <nil>
-
-	// Output:
-	// <nil>
+	for i := 0; i < 10; i++ {
+		p.Send("b", []byte{byte(i)})
+	}
+	assert.Equal(t, info.Producer{
+		Bus:  "mock",
+		Sent: map[string]int{"a": 5, "b": 10},
+	}, p.Info())
 }
 
-func ExampleProducer_SendErr() {
-	// showing:
-	// - Send method returns non-nil error
-
-	p, _ := NewProducer("send_err")
-	if p == nil {
-		return
+func TestProducer_Stop(t *testing.T) {
+	// doesn't error under normal behavior
+	c, _ := NewProducer("")
+	if err := c.Stop(); err != nil {
+		t.Errorf("FAIL: default should not error %s", err)
 	}
-	fmt.Println(p.Send("test-topic", []byte("test-msg"))) // output: send_err
 
-	// Output:
-	// send_err
-}
-
-func ExampleProducer_Stop() {
-	// showing:
-	// - Stop method returns nil error
-
-	p, _ := NewProducer("")
-	if p == nil {
-		return
+	// keyword:stop_err should return error
+	c, _ = NewProducer(Stop_err)
+	if err := c.Stop(); err == nil {
+		t.Error("FAIL: keyword:stop_err should error")
 	}
-	fmt.Println(p.Stop()) // output: <nil>
-
-	// Output:
-	// <nil>
-}
-
-func ExampleProducer_StopErr() {
-	// showing:
-	// - Stop method returns nil error
-
-	p, _ := NewProducer("stop_err")
-	if p == nil {
-		return
-	}
-	fmt.Println(p.Stop()) // output: stop_err
-
-	// Output:
-	// stop_err
 }

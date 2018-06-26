@@ -1,170 +1,87 @@
 package nop
 
 import (
-	"fmt"
+	"testing"
+
+	"github.com/jbsmith7741/trial"
 )
 
-func ExampleNewConsumer() {
-	// showing:
-	// - non-nil consumer without err
-
-	// non-nil consumer
-	// using a non-supported mock string just
-	// to demonstrate that Mock property is
-	// set correctly.
-	c, err := NewConsumer("mock_string")
-	if c == nil {
-		return
+func TestNewConsumer(t *testing.T) {
+	// doesn't error under normal behavior
+	c, err := NewConsumer("")
+	if c == nil || err != nil {
+		t.Error("FAIL: default nop should not error")
 	}
-	fmt.Println(c.Mock) // output: mock_string
-	fmt.Println(err)    // output: <nil>
 
-	// Output:
-	// mock_string
-	// <nil>
-}
-
-func ExampleNewConsumerErr() {
-	// showing:
-	// - nil consumer with err
-
-	// nil consumer with err
-	c, err := NewConsumer("init_err")
+	// keyword:init_err should return error
+	_, err = NewConsumer(Init_err)
 	if err == nil {
-		return
+		t.Error("FAIL: init_err should return error")
 	}
 
-	fmt.Println(c)           // output: <nil>
-	fmt.Println(err.Error()) // output: init_err
-
-	// Output:
-	// <nil>
-	// init_err
 }
 
-func ExampleConsumer_Msg() {
-	// showing:
-	// - Msg msg standard response
+func TestConsumer_Msg(t *testing.T) {
+	type Output struct {
+		msg  []byte
+		done bool
+	}
+	fn := func(args ...interface{}) (interface{}, error) {
+		mock := args[0].(string)
+		c, err := NewConsumer(mock)
+		if err != nil {
+			return Output{}, err
+		}
+		msg, done, err := c.Msg()
+		return Output{msg, done}, err
+	}
 
+	trial.New(fn, trial.Cases{
+		"default": {
+			Input:    "",
+			Expected: Output{msg: FakeMsg},
+		},
+		"keyword: msg_err": {
+			Input:     Msg_err,
+			ShouldErr: true,
+		},
+		"keyword: msg_done": {
+			Input: Msg_done,
+			Expected: Output{
+				msg:  nil,
+				done: true,
+			},
+		},
+		"keyword: msg_msg_done": {
+			Input: Msg_msg_done,
+			Expected: Output{
+				msg:  FakeMsg,
+				done: true,
+			},
+		},
+	}).Test(t)
+}
+
+func TestConsumer_Info(t *testing.T) {
 	c, _ := NewConsumer("")
-	if c == nil {
-		return
+	for i := 0; i < 10; i++ {
+		c.Msg()
 	}
-	msg, done, err := c.Msg()
-	fmt.Println(string(msg)) // output: {"type":"test","info":"test-info","created":"2017-01-01T00:00:01Z"}
-	fmt.Println(done)        // output: false
-	fmt.Println(err)         // output: <nil>
-
-	// Output:
-	// {"type":"test","info":"test-info","created":"2017-01-01T00:00:01Z"}
-	// false
-	// <nil>
+	if c.Info().Received != 10 {
+		t.Errorf("FAIL: messages recieved 10 != %d", c.Info().Received)
+	}
 }
 
-func ExampleConsumer_MsgFake() {
-	// showing:
-	// - Msg msg custom fake response
-
+func TestConsumer_Stop(t *testing.T) {
+	// doesn't error under normal behavior
 	c, _ := NewConsumer("")
-	if c == nil {
-		return
+	if err := c.Stop(); err != nil {
+		t.Errorf("FAIL: default should not error %s", err)
 	}
-	origMsg := FakeMsg
-	FakeMsg = []byte("fake msg")
-	msg, done, err := c.Msg()
-	fmt.Println(string(msg)) // output: fake msg
-	fmt.Println(done)        // output: false
-	fmt.Println(err)         // output: <nil>
 
-	FakeMsg = origMsg // return to original state
-
-	// Output:
-	// fake msg
-	// false
-	// <nil>
-}
-
-func ExampleConsumer_MsgDone() {
-	// showing:
-	// - Msg returns done == true
-
-	c, _ := NewConsumer("msg_done")
-	if c == nil {
-		return
+	// keyword:stop_err should return error
+	c, _ = NewConsumer(Stop_err)
+	if err := c.Stop(); err == nil {
+		t.Error("FAIL: keyword:stop_err should error")
 	}
-	msg, done, err := c.Msg()
-	fmt.Println(string(msg)) // output:
-	fmt.Println(done)        // output: true
-	fmt.Println(err)         // output: <nil>
-
-	// Output:
-	//
-	// true
-	// <nil>
-}
-
-func ExampleConsumer_MsgMsgDone() {
-	// showing:
-	// - Msg returns non-nil msg and done == true
-
-	c, _ := NewConsumer("msg_msg_done")
-	if c == nil {
-		return
-	}
-	msg, done, err := c.Msg()
-	fmt.Println(string(msg)) // output: {"type":"test","info":"test-info","created":"2017-01-01T00:00:01Z"}
-	fmt.Println(done)        // output: true
-	fmt.Println(err)         // output: <nil>
-
-	// Output:
-	// {"type":"test","info":"test-info","created":"2017-01-01T00:00:01Z"}
-	// true
-	// <nil>
-}
-
-func ExampleConsumer_MsgErr() {
-	// showing:
-	// - Msg err != nil
-
-	c, _ := NewConsumer("msg_err")
-	if c == nil {
-		return
-	}
-	msg, done, err := c.Msg()
-	fmt.Println(string(msg)) // output:
-	fmt.Println(done)        // output: fals
-	fmt.Println(err)         // output: msg_err
-
-	// Output:
-	//
-	// false
-	// msg_err
-}
-
-func ExampleConsumer_Stop() {
-	// showing:
-	// - Stop method returns nil error
-
-	c, _ := NewConsumer("")
-	if c == nil {
-		return
-	}
-	fmt.Println(c.Stop()) // output: <nil>
-
-	// Output:
-	// <nil>
-}
-
-func ExampleConsumer_StopErr() {
-	// showing:
-	// - Stop method returns nil error
-
-	c, _ := NewConsumer("stop_err")
-	if c == nil {
-		return
-	}
-	fmt.Println(c.Stop()) // output: stop_err
-
-	// Output:
-	// stop_err
 }

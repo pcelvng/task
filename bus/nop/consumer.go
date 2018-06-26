@@ -1,6 +1,20 @@
 package nop
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/pcelvng/task/bus/info"
+)
+
+const (
+	// Init_err returns err on NewConsumer
+	Init_err = "init_err"
+	Msg_err  = "msg_err" // returns err on Consumer.Msg() call.
+	//Err = "err" //  every method returns an error
+	Msg_done     = "msg_done"     // returns a nil task message done=true on Consumer.Msg() call.
+	Msg_msg_done = "msg_msg_done" // returns a non-nil task message and done=true Consumer.Msg() call.
+	Stop_err     = "stop_err"     // returns err on Stop() method call
+)
 
 // FakeMsg can be set to control the returned
 // Msg() msg value.
@@ -14,30 +28,24 @@ func NewConsumer(mock string) (*Consumer, error) {
 		return nil, errors.New(mock)
 	}
 
-	return &Consumer{mock}, nil
+	return &Consumer{Mock: mock, Stats: info.Consumer{Bus: "nop"}}, nil
 }
 
 // Consumer is a no-operation consumer. It
 // does not do anything and is useful for mocking.
 type Consumer struct {
-	// Mock can be set in order to
-	// mock various return scenarios.
-	//
-	// Supported Values:
-	// - "init_err" - returns err on NewConsumer
-	// - "err" - every method returns an error
-	// - "msg_err" - returns err on Consumer.Msg() call.
-	// - "msg_done" - returns a nil task message done=true on Consumer.Msg() call.
-	// - "msg_msg_done" - returns a non-nil task message and done=true Consumer.Msg() call.
-	// - "stop_err" - returns err on Stop() method call
-	Mock string
+
+	// Mock can be for mocking Consumer
+	// see const above for supported values
+	Mock  string
+	Stats info.Consumer
 }
 
 // Msg will always return a fake task message unless err != nil
 // or Mock == "msg_done".
 func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	if c.Mock == "msg_err" {
-		return msg, done, errors.New(c.Mock)
+		return msg, false, errors.New(c.Mock)
 	}
 
 	if c.Mock == "msg_done" {
@@ -49,8 +57,13 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	}
 
 	// set fake msg
+	c.Stats.Received++
 	msg = FakeMsg
 	return msg, done, err
+}
+
+func (c *Consumer) Info() info.Consumer {
+	return c.Stats
 }
 
 // Stop is a mock consumer Stop method.

@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/pcelvng/task/bus/info"
 )
 
 func NewConsumer(pth string) (*Consumer, error) {
@@ -37,6 +39,9 @@ func NewConsumer(pth string) (*Consumer, error) {
 		pth:     pth,
 		ctx:     ctx,
 		cncl:    cncl,
+		info: info.Consumer{
+			Bus: pth,
+		},
 	}
 
 	return c, nil
@@ -52,12 +57,12 @@ type Consumer struct {
 	ctx  context.Context
 	cncl context.CancelFunc
 	sync.Mutex
+	info info.Consumer
 }
 
 func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	if c.ctx.Err() != nil {
-		done = true
-		return msg, done, nil
+		return msg, true, nil
 	}
 
 	// don't allow concurrent calls to Scan()
@@ -79,10 +84,15 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 
 	select {
 	case <-scanChan:
+		c.info.Received++
 	case <-c.ctx.Done():
 	}
 
 	return msg, done, err
+}
+
+func (c *Consumer) Info() info.Consumer {
+	return c.info
 }
 
 func (c *Consumer) Stop() error {
