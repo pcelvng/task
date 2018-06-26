@@ -27,6 +27,8 @@ import (
 // This did not happen in doing the same thing between two terminal
 // instances.
 func TestMain(m *testing.M) {
+	// tests running on linux are timing out (taking more than 10 minutes)
+	// TODO: fix tests for linux
 	if runtime.GOOS != "darwin" {
 		return
 	}

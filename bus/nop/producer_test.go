@@ -16,7 +16,7 @@ func TestNewProducer(t *testing.T) {
 	}
 
 	// keyword:init_err should return error
-	_, err = NewProducer(Init_err)
+	_, err = NewProducer(InitErr)
 	if err == nil {
 		t.Error("FAIL: init_err should return error")
 	}
@@ -91,7 +91,7 @@ func TestProducer_Stop(t *testing.T) {
 	}
 
 	// keyword:stop_err should return error
-	c, _ = NewProducer(Stop_err)
+	c, _ = NewProducer(StopErr)
 	if err := c.Stop(); err == nil {
 		t.Error("FAIL: keyword:stop_err should error")
 	}

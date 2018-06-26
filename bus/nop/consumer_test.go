@@ -14,7 +14,7 @@ func TestNewConsumer(t *testing.T) {
 	}
 
 	// keyword:init_err should return error
-	_, err = NewConsumer(Init_err)
+	_, err = NewConsumer(InitErr)
 	if err == nil {
 		t.Error("FAIL: init_err should return error")
 	}
@@ -42,18 +42,18 @@ func TestConsumer_Msg(t *testing.T) {
 			Expected: Output{msg: FakeMsg},
 		},
 		"keyword: msg_err": {
-			Input:     Msg_err,
+			Input:     MsgErr,
 			ShouldErr: true,
 		},
 		"keyword: msg_done": {
-			Input: Msg_done,
+			Input: MsgDone,
 			Expected: Output{
 				msg:  nil,
 				done: true,
 			},
 		},
 		"keyword: msg_msg_done": {
-			Input: Msg_msg_done,
+			Input: MsgMsgDone,
 			Expected: Output{
 				msg:  FakeMsg,
 				done: true,
@@ -80,7 +80,7 @@ func TestConsumer_Stop(t *testing.T) {
 	}
 
 	// keyword:stop_err should return error
-	c, _ = NewConsumer(Stop_err)
+	c, _ = NewConsumer(StopErr)
 	if err := c.Stop(); err == nil {
 		t.Error("FAIL: keyword:stop_err should error")
 	}
