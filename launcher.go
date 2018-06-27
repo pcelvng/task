@@ -330,7 +330,7 @@ type Launcher struct {
 }
 
 type LauncherStats struct {
-	RunTime       string
+	RunTime       string        `json:"runtime"`
 	TasksConsumed int64         `json:"tasks_consumed"`
 	TasksRunning  int64         `json:"tasks_running"`
 	MeanTaskTime  string        `json:"mean_tasktime,omitempty"`

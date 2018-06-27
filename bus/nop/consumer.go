@@ -8,12 +8,12 @@ import (
 
 const (
 	// Init_err returns err on NewConsumer
-	Init_err = "init_err"
-	Msg_err  = "msg_err" // returns err on Consumer.Msg() call.
+	InitErr = "init_err"
+	MsgErr  = "msg_err" // returns err on Consumer.Msg() call.
 	//Err = "err" //  every method returns an error
-	Msg_done     = "msg_done"     // returns a nil task message done=true on Consumer.Msg() call.
-	Msg_msg_done = "msg_msg_done" // returns a non-nil task message and done=true Consumer.Msg() call.
-	Stop_err     = "stop_err"     // returns err on Stop() method call
+	MsgDone    = "msg_done"     // returns a nil task message done=true on Consumer.Msg() call.
+	MsgMsgDone = "msg_msg_done" // returns a non-nil task message and done=true Consumer.Msg() call.
+	StopErr    = "stop_err"     // returns err on Stop() method call
 )
 
 // FakeMsg can be set to control the returned
@@ -37,6 +37,13 @@ type Consumer struct {
 
 	// Mock can be for mocking Consumer
 	// see const above for supported values
+	// Supported Values:
+	// - "init_err" - returns err on NewConsumer
+	// - "err" - every method returns an error
+	// - "msg_err" - returns err on Consumer.Msg() call.
+	// - "msg_done" - returns a nil task message done=true on Consumer.Msg() call.
+	// - "msg_msg_done" - returns a non-nil task message and done=true Consumer.Msg() call.
+	// - "stop_err" - returns err on Stop() method call
 	Mock  string
 	Stats info.Consumer
 }
