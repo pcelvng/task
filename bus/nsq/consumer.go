@@ -2,6 +2,7 @@ package nsq
 
 import (
 	"context"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,6 +58,29 @@ func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
 	return c, nil
 }
 
+func (c *Consumer) checkMaxInFlight(topic, channel string) {
+	// consumer is consider locked up if
+	// 1. channel has depth
+	// 2. msqRequested > msqReceived // is waiting for a message
+	// 3. prevReceived = msgReceived // no new message has come in time limit
+	var prev int64
+	for ; ; time.Sleep(10 * time.Second) {
+		depth := getDepth(c.opt.LookupdAddrs, topic, channel)
+		if depth <= 0 || c.msgRequested <= c.msgReceived {
+			continue
+		}
+
+		if prev == c.msgReceived {
+			//set maxinflight to 2, wait
+			log.Println("lockup detected: maxInFlight set to 2")
+			c.consumer.ChangeMaxInFlight(2)
+		} else {
+			prev = c.msgReceived
+		}
+
+	}
+}
+
 type Consumer struct {
 	opt      *Option
 	nsqConf  *gonsq.Config
@@ -98,6 +122,8 @@ func (c *Consumer) connect(topic, channel string) error {
 	if err != nil {
 		return err
 	}
+
+	go c.checkMaxInFlight(topic, channel)
 
 	// set custom logger
 	if c.opt.Logger != nil {
