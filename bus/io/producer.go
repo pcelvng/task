@@ -10,7 +10,7 @@ import (
 
 func NewStdoutProducer() *Producer {
 	return &Producer{
-		isStdout: true,
+		file: os.Stdout,
 		info: info.Producer{
 			Bus:  "stdout",
 			Sent: make(map[string]int),
@@ -30,7 +30,7 @@ func NewNullProducer() *Producer {
 
 func NewStdErrProducer() *Producer {
 	return &Producer{
-		isStderr: true,
+		file: os.Stderr,
 		info: info.Producer{
 			Bus:  "stderr",
 			Sent: make(map[string]int),
@@ -45,11 +45,10 @@ func NewProducer() *Producer {
 }
 
 type Producer struct {
-	isStdout bool
-	isNull   bool
-	isStderr bool
-	mu       sync.Mutex
-	info     info.Producer
+	file   *os.File
+	isNull bool
+	mu     sync.Mutex
+	info   info.Producer
 }
 
 // Send takes a topic and the message to send. The topic is
@@ -58,21 +57,24 @@ type Producer struct {
 //
 // If initialized with NewStdoutProducer then the msg will
 // always be written to "/dev/stdout".
-func (p *Producer) Send(topic string, msg []byte) error {
-	if p.isStdout {
-		topic = "/dev/stdout" // topic is always stdout.
-	}
-
+func (p *Producer) Send(topic string, msg []byte) (err error) {
 	if p.isNull {
 		topic = "/dev/null"
 	}
-
-	if p.isStderr {
-		topic = "/dev/stderr"
-	}
-
 	if topic == "" {
 		return errors.New("topic required")
+	}
+
+	var f *os.File
+
+	if p.file != nil {
+		f = p.file
+	} else {
+		f, err = os.OpenFile(topic, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
 	}
 
 	if (len(msg) == 0) || (msg[len(msg)-1] != '\n') {
@@ -82,13 +84,8 @@ func (p *Producer) Send(topic string, msg []byte) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	f, err := os.OpenFile(topic, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		return err
-	}
 	p.info.Sent[topic]++
 	_, err = f.Write(msg)
-	f.Close()
 	return err
 }
 

@@ -38,21 +38,21 @@ func TestProducer_Info(t *testing.T) {
 		"stdout writer": {
 			Input: input{
 				producer: NewStdoutProducer(),
-				messages: map[string][]string{"": {"quick brown fox"}},
+				messages: map[string][]string{"stdout": {"quick brown fox"}},
 			},
 			Expected: info.Producer{
 				Bus:  "stdout",
-				Sent: map[string]int{"/dev/stdout": 1},
+				Sent: map[string]int{"stdout": 1},
 			},
 		},
 		"stderr writer": {
 			Input: input{
 				producer: NewStdErrProducer(),
-				messages: map[string][]string{"": {"", "apple", "pinapple"}},
+				messages: map[string][]string{"stderr": {"", "apple", "pinapple"}},
 			},
 			Expected: info.Producer{
 				Bus:  "stderr",
-				Sent: map[string]int{"/dev/stderr": 3},
+				Sent: map[string]int{"stderr": 3},
 			},
 		},
 		"topic required error": {

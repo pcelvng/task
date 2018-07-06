@@ -1,11 +1,10 @@
 package nsq
 
 import (
-	"io/ioutil"
-	"net/http"
-
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 )
 
 func getDepth(lookupd []string, topic, channel string) int {
