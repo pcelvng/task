@@ -63,6 +63,7 @@ func (c *Consumer) checkMaxInFlight(topic, channel string) {
 	// 1. channel has depth
 	// 2. msqRequested > msqReceived // is waiting for a message
 	// 3. prevReceived = msgReceived // no new message has come in time limit
+	maxInFlight := 2
 	var prev int64
 	for ; ; time.Sleep(10 * time.Second) {
 		depth := getDepth(c.opt.LookupdAddrs, topic, channel)
@@ -72,8 +73,12 @@ func (c *Consumer) checkMaxInFlight(topic, channel string) {
 
 		if prev == c.msgReceived {
 			//set maxinflight to 2, wait
-			log.Println("lockup detected: maxInFlight set to 2")
-			c.consumer.ChangeMaxInFlight(2)
+			log.Printf("lockup detected: maxInFlight set to %d", maxInFlight)
+			c.consumer.ChangeMaxInFlight(maxInFlight)
+			maxInFlight++
+			if maxInFlight > 5 {
+				maxInFlight = 2
+			}
 		} else {
 			prev = c.msgReceived
 		}
