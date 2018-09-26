@@ -87,13 +87,9 @@ type Task struct {
 // Start will mark the task as started by populating
 // Started.
 //
-// If Started is already populated then the existing
-// value is returned.
 func (t *Task) Start() time.Time {
-	if t.started.IsZero() {
-		t.started = time.Now().In(time.UTC)
-		t.Started = t.started.Format(time.RFC3339)
-	}
+	t.started = time.Now().In(time.UTC)
+	t.Started = t.started.Format(time.RFC3339)
 
 	return t.started
 }
@@ -101,15 +97,11 @@ func (t *Task) Start() time.Time {
 // End will mark the task as started by populating
 // Ended and setting Result.
 //
-// If Ended is already populated then the existing
-// value is returned.
 func (t *Task) End(r Result, msg string) time.Time {
-	if t.ended.IsZero() {
-		t.Result = r
-		t.Msg = msg
-		t.ended = time.Now().In(time.UTC)
-		t.Ended = t.ended.Format(time.RFC3339)
-	}
+	t.Result = r
+	t.Msg = msg
+	t.ended = time.Now().In(time.UTC)
+	t.Ended = t.ended.Format(time.RFC3339)
 
 	return t.ended
 }
