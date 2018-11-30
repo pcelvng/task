@@ -66,6 +66,10 @@ func NewFromBytes(b []byte) (*Task, error) {
 	return t, nil
 }
 
+func IsZero(t Task) bool {
+	return t.Type == "" && t.Result == "" && t.Created == "" && t.Info == "" 
+}
+
 type Task struct {
 	Type    string `json:"type"` // identifier that indicates the type of worker that knows how to complete the task
 	Info    string `json:"info"` // information that tells the worker the specifics of executing the task
