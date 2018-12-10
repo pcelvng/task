@@ -68,6 +68,8 @@ func (p *Producer) Stop() error {
 }
 
 func (p *Producer) Contains(topic string, msg []byte) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	for _, m := range p.Messages[topic] {
 		if strings.Contains(m, string(msg)) {
 			return true
