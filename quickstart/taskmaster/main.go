@@ -16,5 +16,5 @@ func main() {
 
 	tskJson := task.New(*tskType, *tskInfo).JSONBytes()
 	tskBus, _ := task.NewBus(task.NewBusOptions(""))
-	tskBus.Send("", tskJson)
+	tskBus.Send("stdout", tskJson)
 }
