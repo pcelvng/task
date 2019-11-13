@@ -196,6 +196,7 @@ func NewProducer(opt *Options) (Producer, error) {
 
 // NewConsumer creates a bus consumer from BusConfig.
 func NewConsumer(opt *Options) (Consumer, error) {
+
 	if opt == nil {
 		opt = NewOptions("")
 	}
