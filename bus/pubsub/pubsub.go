@@ -5,9 +5,6 @@ import (
 )
 
 type Option struct {
-	// not sure if increasing connections works
-	Connections int `uri:"conns" default:"2"`
-
 	// host should only be set for emulator
 	Host           string `uri:"host"`
 	ProjectID      string `uri:"project"`
@@ -20,16 +17,11 @@ type Option struct {
 
 func NewOption(host, project, subscription, topic, jsonauth string, conn int) *Option {
 	o := &Option{
-		Connections:    1,
 		Host:           "", // only used for the emulator
 		ProjectID:      "project.id",
 		SubscriptionID: "default.topic.channel",
 		Topic:          "default.topic",
 		JSONAuth:       "",
-	}
-
-	if conn > 1 {
-		o.Connections = conn
 	}
 
 	if project != "" {

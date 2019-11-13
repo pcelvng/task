@@ -135,6 +135,7 @@ func NewLauncher(newWkr NewWorker, opt *LauncherOptions, bOpt *bus.Options) (*La
 // Usually not necessary to use directly unless the caller
 // is providing a non-standard library consumer, producer buses.
 func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *Launcher {
+
 	// Launcher options
 	if opt == nil {
 		opt = NewLauncherOptions("")

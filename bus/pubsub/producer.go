@@ -26,17 +26,15 @@ type Producer struct {
 }
 
 func (o *Option) NewProducer() (p *Producer, err error) {
+	opts := make([]option.ClientOption, 0)
+	opts = append(opts, option.WithGRPCConnectionPool(1))
+
 	if o.Host != "" && o.Host != "/" {
 		os.Setenv("PUBSUB_EMULATOR_HOST", o.Host)
 	}
 
 	if o.ProjectID != "" {
 		os.Setenv("PUBSUB_PROJECT_ID", o.ProjectID)
-	}
-
-	opts := make([]option.ClientOption, 0)
-	if o.Connections > 1 {
-		opts = append(opts, option.WithGRPCConnectionPool(o.Connections))
 	}
 
 	if o.JSONAuth != "" {

@@ -28,6 +28,7 @@ type Consumer struct {
 
 func (o *Option) NewConsumer() (c *Consumer, err error) {
 	opts := make([]option.ClientOption, 0)
+	opts = append(opts, option.WithGRPCConnectionPool(1))
 
 	if o.Host != "" && o.Host != "/" {
 		fmt.Println("setting PUBSUB_EMULATOR_HOST as", o.Host)
@@ -37,10 +38,6 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 	if o.ProjectID != "" {
 		fmt.Println("setting PUBSUB_PROJECT_ID as", o.ProjectID)
 		os.Setenv("PUBSUB_PROJECT_ID", o.ProjectID)
-	}
-
-	if o.Connections > 1 {
-		opts = append(opts, option.WithGRPCConnectionPool(o.Connections))
 	}
 
 	if o.JSONAuth != "" {
