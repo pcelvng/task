@@ -50,7 +50,7 @@ func (o *Option) NewProducer() (p *Producer, err error) {
 	// create context for clean shutdown
 	p.ctx, p.cncl = context.WithCancel(context.Background())
 
-	p.client, err = ps.NewClient(p.ctx, o.ProjectID)
+	p.client, err = ps.NewClient(p.ctx, o.ProjectID, opts...)
 	if err != nil {
 		return nil, err
 	}

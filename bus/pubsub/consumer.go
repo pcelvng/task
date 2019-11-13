@@ -7,6 +7,7 @@ import (
 
 	psb "cloud.google.com/go/pubsub/apiv1"
 	"github.com/pcelvng/task/bus/info"
+	"google.golang.org/api/option"
 	ps "google.golang.org/genproto/googleapis/pubsub/v1"
 )
 
@@ -33,6 +34,15 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 		os.Setenv("PUBSUB_PROJECT_ID", o.ProjectID)
 	}
 
+	opts := make([]option.ClientOption, 0)
+	if o.Connections > 1 {
+		opts = append(opts, option.WithGRPCConnectionPool(o.Connections))
+	}
+
+	if o.JSONAuth != "" {
+		opts = append(opts, option.WithCredentialsFile(o.JSONAuth))
+	}
+
 	c = &Consumer{
 		info: info.Consumer{
 			Bus:   "pubsub",
@@ -42,8 +52,10 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 
 	// create context for clean shutdown
 	c.ctx, c.cncl = context.WithCancel(context.Background())
-	c.client, err = psb.NewSubscriberClient(c.ctx)
-
+	c.client, err = psb.NewSubscriberClient(c.ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
 	path := fmt.Sprintf("projects/%s/subscriptions/%s", o.ProjectID, o.SubscriptionID)
 
 	// Be sure to tune the MaxMessages parameter per your project's needs, and accordingly
@@ -53,7 +65,7 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 		MaxMessages:  1,
 	}
 
-	return c, err
+	return c, nil
 }
 
 // Msg never blocks, not sure if this is how it's supposed to work (needs testing)
