@@ -27,7 +27,6 @@ type Producer struct {
 
 func (o *Option) NewProducer() (p *Producer, err error) {
 	opts := make([]option.ClientOption, 0)
-	opts = append(opts, option.WithGRPCConnectionPool(1))
 
 	if o.Host != "" && o.Host != "/" {
 		os.Setenv("PUBSUB_EMULATOR_HOST", o.Host)
@@ -83,7 +82,7 @@ func (p *Producer) Send(topic string, msg []byte) (err error) {
 
 	// publish message to pubsub
 	res := t.Publish(p.ctx, &ps.Message{Data: msg})
-	serverid, err := res.Get(p.ctx)
+	_, err = res.Get(p.ctx)
 	if err != nil {
 		return err
 	}
@@ -92,7 +91,6 @@ func (p *Producer) Send(topic string, msg []byte) (err error) {
 	p.info.Sent[topic]++
 	p.mux.Unlock()
 
-	fmt.Println("serverid", serverid)
 	return nil
 }
 

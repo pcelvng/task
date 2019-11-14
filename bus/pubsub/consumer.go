@@ -3,7 +3,6 @@ package pubsub
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -28,7 +27,6 @@ type Consumer struct {
 
 func (o *Option) NewConsumer() (c *Consumer, err error) {
 	opts := make([]option.ClientOption, 0)
-	opts = append(opts, option.WithGRPCConnectionPool(1))
 
 	if o.Host != "" && o.Host != "/" {
 		fmt.Println("setting PUBSUB_EMULATOR_HOST as", o.Host)
@@ -104,12 +102,12 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 
 	c.sub.ReceiveSettings.MaxOutstandingMessages = 1
 	c.sub.ReceiveSettings.Synchronous = true
-
-	err = c.sub.Receive(context.Background(), func(ctx context.Context, m *pubsub.Message) {
+	cctx, cancel := context.WithCancel(c.ctx)
+	err = c.sub.Receive(cctx, func(ctx context.Context, m *pubsub.Message) {
 		msg = m.Data
-		log.Printf(`received message: '%s' id: %s`, string(msg), m.ID)
 		m.Ack()
 		c.info.Received++
+		cancel()
 	})
 
 	return msg, done, err
