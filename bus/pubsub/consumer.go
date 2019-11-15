@@ -56,27 +56,20 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 		return nil, err
 	}
 
-	// this loop will wait for the topic to be created (retry 10 times)
-	// if it cannot be created after the retries it will fail with a not exists
+	// check for the topic if it doesn't exist create it to use for the subscription
 	topic := c.client.Topic(o.Topic)
-	for retry := 0; ; retry++ {
-		ok, err := topic.Exists(c.ctx)
+	exists, err := topic.Exists(c.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		topic, err = c.client.CreateTopic(c.ctx, o.Topic)
 		if err != nil {
 			return nil, err
 		}
-
-		if ok {
-			break
-		}
-
-		fmt.Printf("topic %s does not exist... waiting...", o.Topic)
-		time.Sleep(time.Second * 3)
-		if retry > 10 {
-			return nil, fmt.Errorf("topic %s does not exist", o.Topic)
-		}
 	}
 
-	// get the subscription for the provided subscription name (id)
+	// get the subscription from the provided subscription name (id)
 	c.sub = c.client.Subscription(o.SubscriptionID)
 
 	// if the subscription does not exist, create the subscription
