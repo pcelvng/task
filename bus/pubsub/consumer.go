@@ -25,6 +25,7 @@ type Consumer struct {
 	info info.Consumer
 }
 
+// NewConsumer creates a new consumer for reading messages from pubsub
 func (o *Option) NewConsumer() (c *Consumer, err error) {
 	opts := make([]option.ClientOption, 0)
 
@@ -86,7 +87,9 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 	return c, nil
 }
 
-// Msg never blocks, not sure if this is how it's supposed to work (needs testing)
+// Msg never blocks
+// sets subscription to only have, at max, one message in memory at a time
+// sets subscription to synchronous to only allow one message in memory at a time
 func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	if c.ctx.Err() != nil {
 		// should not attempt to read if already stopped

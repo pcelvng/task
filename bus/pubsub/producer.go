@@ -25,6 +25,7 @@ type Producer struct {
 	mux sync.Mutex
 }
 
+// NewProducer will create a new pubsub producer for publishing messages to pubsub
 func (o *Option) NewProducer() (p *Producer, err error) {
 	opts := make([]option.ClientOption, 0)
 
@@ -56,6 +57,8 @@ func (o *Option) NewProducer() (p *Producer, err error) {
 }
 
 // Send will send one message to the topic
+// Settings are for publishing one message at a time with a 100 millisecond delay
+// locking is used to update the topic count of published messages.
 func (p *Producer) Send(topic string, msg []byte) (err error) {
 	// should not attempt to send if producer already stopped.
 	if p.ctx.Err() != nil {

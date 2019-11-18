@@ -171,7 +171,7 @@ func NewProducer(opt *Options) (Producer, error) {
 
 		p, err = nsqbus.NewProducer(nsqOpt)
 	case "pubsub":
-		psOpt := pubsub.NewOption(opt.PubsubHost, opt.ProjectID, opt.InChannel, opt.InTopic, opt.JSONAuth, 2)
+		psOpt := pubsub.NewOption(opt.PubsubHost, opt.ProjectID, opt.InChannel, opt.InTopic, opt.JSONAuth)
 		p, err = psOpt.NewProducer()
 
 	case "nop":
@@ -231,7 +231,7 @@ func NewConsumer(opt *Options) (Consumer, error) {
 		c, err = nsqbus.NewConsumer(opt.InTopic, opt.InChannel, nsqOpt)
 
 	case "pubsub":
-		psOpt := pubsub.NewOption(opt.PubsubHost, opt.ProjectID, opt.InChannel, opt.InTopic, opt.JSONAuth, 1)
+		psOpt := pubsub.NewOption(opt.PubsubHost, opt.ProjectID, opt.InChannel, opt.InTopic, opt.JSONAuth)
 		c, err = psOpt.NewConsumer()
 
 	case "nop":

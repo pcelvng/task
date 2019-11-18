@@ -4,6 +4,7 @@ import (
 	"log"
 )
 
+// Option are the settings to connect to a pubsub project instance.
 type Option struct {
 	// host should only be set for emulator
 	Host           string `uri:"host"`
@@ -15,7 +16,13 @@ type Option struct {
 	Logger *log.Logger
 }
 
-func NewOption(host, project, subscription, topic, jsonauth string, conn int) *Option {
+// NewOption creates a set of default options for pubsub,
+// host is only used for the fake emulator
+// project is the google project (id) name
+// subscription is the name of the pubsub subscription will be created if it doesn't exit
+// topic is the pubsub topic, will be created if it doesn't exist
+// jsonauth is the generated json string authorization settings for access to pubsub
+func NewOption(host, project, subscription, topic, jsonauth string) *Option {
 	o := &Option{
 		Host:           "", // only used for the emulator
 		ProjectID:      "project.id",
