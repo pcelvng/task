@@ -105,6 +105,7 @@ type LauncherOptions struct {
 
 // NewLauncher creates a new Launcher.
 func NewLauncher(newWkr NewWorker, opt *LauncherOptions, bOpt *bus.Options) (*Launcher, error) {
+
 	if opt == nil {
 		opt = NewLauncherOptions("")
 	}
@@ -134,6 +135,7 @@ func NewLauncher(newWkr NewWorker, opt *LauncherOptions, bOpt *bus.Options) (*La
 // Usually not necessary to use directly unless the caller
 // is providing a non-standard library consumer, producer buses.
 func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *LauncherOptions) *Launcher {
+
 	// Launcher options
 	if opt == nil {
 		opt = NewLauncherOptions("")
@@ -213,7 +215,7 @@ func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *L
 		lgr.Printf("NO WORKERS WILL BE LAUNCHED! task type handling is set to '%v' but no task type is provided", typeHandling)
 	}
 
-	return &Launcher{
+	l := &Launcher{
 		initTime:      time.Now(),
 		isInitialized: true,
 		consumer:      c,
@@ -234,6 +236,8 @@ func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *L
 		slots:         slots,
 		closeTimeout:  workerTimeout,
 	}
+
+	return l
 }
 
 // Launcher handles the heavy lifting of worker lifecycle, general
