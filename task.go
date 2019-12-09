@@ -3,6 +3,8 @@ package task
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // New creates a new Task with the provided type
@@ -12,6 +14,20 @@ func New(tskType, info string) *Task {
 	return &Task{
 		Type:    tskType,
 		Info:    info,
+		ID:      uuid.New().String(),
+		Created: now.Format(time.RFC3339),
+		created: now,
+	}
+}
+
+// NewWithID create a task with a predefined id.
+// This is useful for changing tasks together
+func NewWithID(tskType, info, id string) *Task {
+	now := time.Now().In(time.UTC)
+	return &Task{
+		Type:    tskType,
+		Info:    info,
+		ID:      id,
 		Created: now.Format(time.RFC3339),
 		created: now,
 	}
@@ -67,13 +83,15 @@ func NewFromBytes(b []byte) (*Task, error) {
 }
 
 func IsZero(t Task) bool {
-	return t.Type == "" && t.Result == "" && t.Created == "" && t.Info == "" 
+	return t.Type == "" && t.Result == "" && t.Created == "" && t.Info == ""
 }
 
 type Task struct {
 	Type    string `json:"type"` // identifier that indicates the type of worker that knows how to complete the task
 	Info    string `json:"info"` // information that tells the worker the specifics of executing the task
 	Created string `json:"created,omitempty"`
+	ID      string `json:"id,omitempty"`   // unique report id
+	Meta    string `json:"meta,omitempty"` // additional meta data as required
 
 	// Result fields
 	Result  Result `json:"result,omitempty"`
@@ -88,9 +106,7 @@ type Task struct {
 	ended   time.Time
 }
 
-// Start will mark the task as started by populating
-// Started.
-//
+// Start marks the task as started
 func (t *Task) Start() time.Time {
 	t.started = time.Now().In(time.UTC)
 	t.Started = t.started.Format(time.RFC3339)
