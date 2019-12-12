@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -514,6 +515,10 @@ func (l *Launcher) doLaunch(tsk *Task) {
 		tsk.End(result, msg)
 		execTime := tsk.ended.Sub(tsk.started) / truncTime
 		atomic.AddUint64(&l.taskRunTime, uint64(execTime))
+		if m, ok := worker.(meta); ok {
+			d := m.GetMeta()
+			tsk.Meta = url.Values(d).Encode()
+		}
 		close(doneChan)
 	}()
 
