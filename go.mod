@@ -10,6 +10,7 @@ require (
 	github.com/jbsmith7741/trial v0.3.0
 	github.com/jbsmith7741/uri v0.3.0
 	github.com/nsqio/go-nsq v1.0.7
+	github.com/pkg/errors v0.8.1
 	github.com/stretchr/testify v1.4.0
 	google.golang.org/api v0.14.0
 )

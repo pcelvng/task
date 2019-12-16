@@ -14,6 +14,19 @@ type Worker interface {
 	DoTask(context.Context) (Result, string)
 }
 
+type meta interface {
+	SetMeta(key, value string)
+	GetMeta() map[string][]string
+}
+
+type Meta map[string][]string
+
+func (m Meta) SetMeta(key string, value ...string) {
+	m[key] = value
+}
+
+func (m Meta) GetMeta() map[string][]string { return m }
+
 // IsDone is a helper function that determines if ctx has been canceled
 func IsDone(ctx context.Context) bool {
 	select {
