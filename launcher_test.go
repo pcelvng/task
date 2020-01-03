@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jbsmith7741/trial"
+	"github.com/hydronica/trial"
 	"github.com/jbsmith7741/uri"
 
 	"github.com/pcelvng/task/bus/nop"
@@ -81,27 +81,45 @@ func (w tMetaWorker) DoTask(_ context.Context) (Result, string) {
 }
 
 func TestDoLaunch(t *testing.T) {
-	launcher := &Launcher{
-		stopCtx: context.Background(),
-		lastCtx: context.Background(),
-		slots:   make(chan int, 10),
-		opt:     NewLauncherOptions(""),
-		newWkr: func(_ string) Worker {
-			return tMetaWorker{Meta: make(map[string][]string)}
+	fn := func(in trial.Input) (interface{}, error) {
+		p, err := nop.NewProducer("")
+		if err != nil {
+			return nil, err
+		}
+		launcher := &Launcher{
+			stopCtx:  context.Background(),
+			lastCtx:  context.Background(),
+			slots:    make(chan int, 10),
+			opt:      NewLauncherOptions(""),
+			producer: p,
+			newWkr: func(_ string) Worker {
+				return tMetaWorker{Meta: make(map[string][]string)}
+			},
+		}
+		launcher.wg.Add(1)
+		tsk := &Task{Meta: in.String()}
+		launcher.doLaunch(tsk)
+		if err := json.Unmarshal([]byte(p.Messages["done"][0]), tsk); err != nil {
+			return nil, err
+		}
+		//remove timestamps for comparison
+		tsk.Created, tsk.Started, tsk.Ended = "", "", ""
+		tsk.started, tsk.ended = time.Time{}, time.Time{}
+		return tsk, nil
+	}
+	cases := trial.Cases{
+		"meta is saved": {
+			Input:    "",
+			Expected: &Task{Msg: "done", Result: CompleteResult, Meta: "test-key=value"},
+		},
+		"preserve tm meta": {
+			Input:    "meta=value",
+			Expected: &Task{Msg: "done", Result: CompleteResult, Meta: "meta=value&test-key=value"},
+		},
+		"append meta": {
+			Input:    "test-key=master",
+			Expected: &Task{Msg: "done", Result: CompleteResult, Meta: "test-key=master&test-key=value"},
 		},
 	}
-	p, _ := nop.NewProducer("")
-	launcher.wg.Add(1)
-	launcher.producer = p
-	tsk := &Task{}
-	launcher.doLaunch(tsk)
-	if err := json.Unmarshal([]byte(p.Messages["done"][0]), tsk); err != nil {
-		t.Fatal(err)
-	}
-	tsk.Created, tsk.Started, tsk.Ended = "", "", ""
-	tsk.started, tsk.ended = time.Time{}, time.Time{}
-	eq, diff := trial.Equal(tsk, &Task{Result: "complete", Msg: "done", Meta: "test-key=value"})
-	if !eq {
-		t.Error(diff)
-	}
+	trial.New(fn, cases).SubTest(t)
 }

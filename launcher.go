@@ -516,8 +516,11 @@ func (l *Launcher) doLaunch(tsk *Task) {
 		execTime := tsk.ended.Sub(tsk.started) / truncTime
 		atomic.AddUint64(&l.taskRunTime, uint64(execTime))
 		if m, ok := worker.(meta); ok {
-			d := m.GetMeta()
-			tsk.Meta = url.Values(d).Encode()
+			data, _ := url.ParseQuery(tsk.Meta)
+			for k, v := range m.GetMeta() {
+				data[k] = append(data[k], v...)
+			}
+			tsk.Meta = data.Encode()
 		}
 		close(doneChan)
 	}()

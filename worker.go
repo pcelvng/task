@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"net/url"
 )
 
 // NewWorker is a worker initializer called by the Launcher to
@@ -16,7 +17,7 @@ type Worker interface {
 
 type meta interface {
 	SetMeta(key string, value ...string)
-	GetMeta() map[string][]string
+	GetMeta() url.Values
 }
 
 type Meta map[string][]string
@@ -25,7 +26,12 @@ func (m Meta) SetMeta(key string, value ...string) {
 	m[key] = value
 }
 
-func (m Meta) GetMeta() map[string][]string { return m }
+func (m Meta) GetMeta() url.Values { return url.Values(m) }
+
+// NewMeta initializes Meta's underlying map
+func NewMeta() Meta {
+	return make(map[string][]string)
+}
 
 // IsDone is a helper function that determines if ctx has been canceled
 func IsDone(ctx context.Context) bool {
