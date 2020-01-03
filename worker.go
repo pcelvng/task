@@ -15,7 +15,7 @@ type Worker interface {
 }
 
 type meta interface {
-	SetMeta(key, value string)
+	SetMeta(key string, value ...string)
 	GetMeta() map[string][]string
 }
 
