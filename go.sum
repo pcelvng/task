@@ -54,6 +54,8 @@ github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5m
 github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
 github.com/hashicorp/golang-lru v0.5.1 h1:0hERBMJE1eitiLkihrMvRVBYAkpHzc/J3QdDN+dAcgU=
 github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
+github.com/hydronica/trial v0.4.0 h1:RT7Aa5+RJeqJDIDlIJE+zHL7wNpktx1i66MOgiLaQqE=
+github.com/hydronica/trial v0.4.0/go.mod h1:b9IOkaVa93ny6m1202FP9puhZWxyNsiLYsGSMhkFk+Y=
 github.com/jbsmith7741/go-tools v0.2.0 h1:l4jdjoE4y6Mom5P8vhN3eCUs48CR7dAJINNbuhiE/Oo=
 github.com/jbsmith7741/go-tools v0.2.0/go.mod h1:UIlRAZ6aTSLlVI+owNLWbVS9e/Rywzahvurv/PUVBKg=
 github.com/jbsmith7741/trial v0.3.0 h1:VIMmdwi2BzseuTHODz6UE9ZOMOUJROMfKVz+KRE7JBU=
