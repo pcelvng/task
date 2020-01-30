@@ -3,10 +3,27 @@ package nsq
 import (
 	"io/ioutil"
 	"log"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
 )
+
+var nsqActive bool
+
+func TestMain(t *testing.M) {
+	if r, err := http.Get("127.0.0.1:4151/info"); err != nil || r.StatusCode != 200 {
+		log.Println("nsqd not running")
+	} else {
+		nsqActive = true
+	}
+
+	if r, err := http.Get("127.0.0.1:4161/info"); err != nil || r.StatusCode != 200 {
+		log.Println("nsqlookupd not running")
+		nsqActive = false
+	}
+	t.Run()
+}
 
 func TestNewProducer(t *testing.T) {
 	conf := &Option{}
@@ -24,6 +41,9 @@ func TestNewProducer(t *testing.T) {
 }
 
 func TestProducer(t *testing.T) {
+	if !nsqActive {
+		t.Skip("nsq not running")
+	}
 	// connect with bad address
 	logger := log.New(ioutil.Discard, "", 0)
 	conf := &Option{
@@ -49,7 +69,7 @@ func TestProducer(t *testing.T) {
 	}
 	p, err = NewProducer(conf)
 	if err != nil {
-		t.Errorf("expected nil but got err '%v'\n", err.Error())
+		t.Fatalf("expected nil but got err '%v'\n", err.Error())
 	}
 
 	// send
@@ -123,6 +143,9 @@ func TestProducer(t *testing.T) {
 }
 
 func TestProducer_Race(t *testing.T) {
+	if !nsqActive {
+		t.Skip("nsq not running")
+	}
 	// connect to multiple good nsqds
 	topic := "test-producer-topic"
 	msg := []byte("test message")

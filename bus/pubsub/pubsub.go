@@ -1,7 +1,14 @@
 package pubsub
 
 import (
+	"context"
 	"log"
+	"os"
+	"time"
+
+	"cloud.google.com/go/pubsub"
+	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 // Option are the settings to connect to a pubsub project instance.
@@ -47,4 +54,36 @@ func NewOption(host, project, subscription, topic, jsonauth string) *Option {
 	o.JSONAuth = jsonauth
 
 	return o
+}
+
+func (o *Option) newClient() (*pubsub.Client, error) {
+	opts := make([]option.ClientOption, 0)
+	if o.Host != "" && o.Host != "/" {
+		os.Setenv("PUBSUB_EMULATOR_HOST", o.Host)
+	}
+
+	if o.JSONAuth != "" {
+		opts = append(opts, option.WithCredentialsFile(o.JSONAuth))
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	return pubsub.NewClient(ctx, o.ProjectID, opts...)
+}
+
+func Topics(o *Option) ([]string, error) {
+	client, err := o.newClient()
+	if err != nil {
+		return nil, err
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	q := client.Topics(ctx)
+	topics := make([]string, 0)
+
+	for t, err := q.Next(); err != iterator.Done; t, err = q.Next() {
+		if err != nil {
+			return nil, err
+		}
+		topics = append(topics, t.ID())
+	}
+
+	return topics, err
 }

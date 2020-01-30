@@ -1,10 +1,8 @@
 package nsq
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -16,41 +14,6 @@ import (
 
 	gonsq "github.com/nsqio/go-nsq"
 )
-
-// TestMain will setup nsqd and lookupd. It expects those two binaries
-// to exist in PATH or the tests will fail.
-//
-// WEIRD ISSUE: when I run this test in Gogland the then switch
-// to a terminal to curl nsqd (to check the stats) or visa versa then
-// sometimes the test run will freeze for a long time and then fail with
-// very strange results.
-// This did not happen in doing the same thing between two terminal
-// instances.
-func TestMain(m *testing.M) {
-	// tests running on linux are timing out (taking more than 10 minutes)
-	// TODO: fix tests for linux
-	if runtime.GOOS != "darwin" {
-		return
-	}
-	// start lookupd
-	err := StartLookupd()
-	if err != nil {
-		log.Printf("unable to start lookupd: %v\n", err.Error())
-		os.Exit(1)
-	}
-
-	// start nsqd
-	err = StartNsqd()
-	if err != nil {
-		fmt.Printf("unable to start nsq: %v\n", err.Error())
-		os.Exit(1)
-	}
-
-	exitCode := m.Run()
-	StopLookupd()
-	StopNsqd()
-	os.Exit(exitCode)
-}
 
 // startup will try to start nsq. If successful
 // then nsqOn will bej set to true.
@@ -68,9 +31,9 @@ func TestNewConsumer(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
 	opt := &Option{
-	// Logger:       logger,
-	// NSQdAddrs: []string{"localhost:4150"},
-	// LookupdAddrs: []string{"localhost:4160"},
+		// Logger:       logger,
+		// NSQdAddrs: []string{"localhost:4150"},
+		// LookupdAddrs: []string{"localhost:4160"},
 	}
 
 	c, err := NewConsumer("", "", opt)
@@ -88,9 +51,9 @@ func TestConsumer_ConnectNoTopic(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
 	opt := &Option{
-	// Logger:       logger,
-	// NSQdAddrs: []string{"localhost:4150"},
-	// LookupdAddrs: []string{"localhost:4160"},
+		// Logger:       logger,
+		// NSQdAddrs: []string{"localhost:4150"},
+		// LookupdAddrs: []string{"localhost:4160"},
 	}
 	topic := ""
 	channel := "testchannel"
@@ -112,9 +75,9 @@ func TestConsumer_ConnectNoChannel(t *testing.T) {
 	// turn off nsq client logging
 	//logger := log.New(ioutil.Discard, "", 0)
 	opt := &Option{
-	// Logger:       logger,
-	// NSQdAddrs: []string{"localhost:4150"},
-	// LookupdAddrs: []string{"localhost:4160"},
+		// Logger:       logger,
+		// NSQdAddrs: []string{"localhost:4150"},
+		// LookupdAddrs: []string{"localhost:4160"},
 	}
 	topic := "testtopic"
 	channel := ""
@@ -133,6 +96,9 @@ func TestConsumer_ConnectNoChannel(t *testing.T) {
 }
 
 func TestConsumer_Connect(t *testing.T) {
+	if !nsqActive {
+		t.Skip("nsq not running")
+	}
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
 	opt := &Option{
@@ -192,6 +158,9 @@ func TestConsumer_ConnectNSQdsBad(t *testing.T) {
 }
 
 func TestConsumer_ConnectNSQds(t *testing.T) {
+	if !nsqActive {
+		t.Skip("nsq not running")
+	}
 	// TEST GOOD NSQD
 	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
@@ -262,6 +231,9 @@ func TestConsumer_ConnectLookupdsBad(t *testing.T) {
 }
 
 func TestConsumer_ConnectLookupds(t *testing.T) {
+	if !nsqActive {
+		t.Skip("nsq not running")
+	}
 	// TEST GOOD LOOKUPD
 	// Note: nsq will not return an error if a connection to
 	// lookupd could not be made. It will instead keep trying
@@ -303,6 +275,9 @@ func TestConsumer_ConnectLookupds(t *testing.T) {
 }
 
 func TestConsumer_Msg(t *testing.T) {
+	if !nsqActive {
+		t.Skip("nsq not running")
+	}
 	// TEST MSG
 	//
 	// - Should not load any messages upon connecting
@@ -324,13 +299,18 @@ func TestConsumer_Msg(t *testing.T) {
 	channel := "testchannel"
 
 	msgCnt := 1000
-	AddTasks(topic, msgCnt)
+	if err := AddTasks(topic, msgCnt); err != nil {
+		t.Fatal(err)
+	}
 
 	c, err := NewConsumer(topic, channel, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	go func() {
+		time.Sleep(25 * time.Second)
+		c.consumer.Stop()
+	}()
 	// check that there is a connection
 	stats := c.consumer.Stats()
 	expected := 1

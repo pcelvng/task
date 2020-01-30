@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
 	ps "cloud.google.com/go/pubsub"
+
 	"github.com/pcelvng/task/bus/info"
-	"google.golang.org/api/option"
 )
 
 type Producer struct {
@@ -27,20 +26,6 @@ type Producer struct {
 
 // NewProducer will create a new pubsub producer for publishing messages to pubsub
 func (o *Option) NewProducer() (p *Producer, err error) {
-	opts := make([]option.ClientOption, 0)
-
-	if o.Host != "" && o.Host != "/" {
-		os.Setenv("PUBSUB_EMULATOR_HOST", o.Host)
-	}
-
-	if o.ProjectID != "" {
-		os.Setenv("PUBSUB_PROJECT_ID", o.ProjectID)
-	}
-
-	if o.JSONAuth != "" {
-		opts = append(opts, option.WithCredentialsFile(o.JSONAuth))
-	}
-
 	p = &Producer{
 		info: info.Producer{Bus: "pubsub", Sent: make(map[string]int)},
 	}
@@ -48,7 +33,7 @@ func (o *Option) NewProducer() (p *Producer, err error) {
 	// create context for clean shutdown
 	p.ctx, p.cncl = context.WithCancel(context.Background())
 
-	p.client, err = ps.NewClient(p.ctx, o.ProjectID, opts...)
+	p.client, err = o.newClient()
 	if err != nil {
 		return nil, err
 	}
