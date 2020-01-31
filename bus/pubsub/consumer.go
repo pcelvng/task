@@ -2,13 +2,11 @@ package pubsub
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"time"
 
 	"cloud.google.com/go/pubsub"
+
 	"github.com/pcelvng/task/bus/info"
-	"google.golang.org/api/option"
 )
 
 type Consumer struct {
@@ -27,22 +25,6 @@ type Consumer struct {
 
 // NewConsumer creates a new consumer for reading messages from pubsub
 func (o *Option) NewConsumer() (c *Consumer, err error) {
-	opts := make([]option.ClientOption, 0)
-
-	if o.Host != "" && o.Host != "/" {
-		fmt.Println("setting PUBSUB_EMULATOR_HOST as", o.Host)
-		os.Setenv("PUBSUB_EMULATOR_HOST", o.Host)
-	}
-
-	if o.ProjectID != "" {
-		fmt.Println("setting PUBSUB_PROJECT_ID as", o.ProjectID)
-		os.Setenv("PUBSUB_PROJECT_ID", o.ProjectID)
-	}
-
-	if o.JSONAuth != "" {
-		opts = append(opts, option.WithCredentialsFile(o.JSONAuth))
-	}
-
 	c = &Consumer{
 		info: info.Consumer{
 			Bus:   "pubsub",
@@ -50,14 +32,15 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 		},
 	}
 
-	// create context for clean shutdown
-	c.ctx, c.cncl = context.WithCancel(context.Background())
-	c.client, err = pubsub.NewClient(c.ctx, o.ProjectID, opts...)
+	c.client, err = o.newClient()
 	if err != nil {
 		return nil, err
 	}
 
 	// check for the topic if it doesn't exist create it to use for the subscription
+	// create context for clean shutdown
+	c.ctx, c.cncl = context.WithCancel(context.Background())
+
 	topic := c.client.Topic(o.Topic)
 	exists, err := topic.Exists(c.ctx)
 	if err != nil {

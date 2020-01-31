@@ -253,3 +253,28 @@ func NewConsumer(opt *Options) (Consumer, error) {
 
 	return c, nil
 }
+
+// Topics returns a list of the topics for the given bus
+func Topics(opt *Options) (topics []string, err error) {
+	if opt == nil {
+		return nil, errors.New("options must be defined")
+	}
+	busType := opt.Bus
+	if opt.InBus != "" {
+		// in bus value override
+		busType = opt.InBus
+	}
+	switch busType {
+	case "pubsub":
+		psOpt := pubsub.NewOption(opt.PubsubHost, opt.ProjectID, opt.InChannel, opt.InTopic, opt.JSONAuth)
+		return pubsub.Topics(psOpt)
+	case "nsq":
+		hosts := opt.LookupdHosts
+		if len(hosts) == 0 {
+			hosts = opt.NSQdHosts
+		}
+		return nsqbus.Topics(hosts)
+	default:
+		return nil, fmt.Errorf("topics does not support %s bus type", busType)
+	}
+}
