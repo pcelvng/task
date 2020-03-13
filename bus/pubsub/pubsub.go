@@ -71,6 +71,7 @@ func (o *Option) newClient() (*pubsub.Client, error) {
 
 func Topics(o *Option) ([]string, error) {
 	client, err := o.newClient()
+	defer client.Close()
 	if err != nil {
 		return nil, err
 	}
