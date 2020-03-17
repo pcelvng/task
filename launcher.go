@@ -400,8 +400,6 @@ func (l *Launcher) do() {
 			goto Shutdown
 		case <-l.slots:
 			l.wg.Add(1)
-			atomic.AddInt64(&l.tasksRunning, 1)
-			atomic.AddInt64(&l.tasksConsumed, 1)
 			l.mu.Lock()
 			if l.remaining != 0 {
 				if l.remaining > 0 {
@@ -471,7 +469,12 @@ func (l *Launcher) next() {
 
 	// launch worker and do task
 	if tsk != nil {
-		go l.doLaunch(tsk)
+		go func() {
+			atomic.AddInt64(&l.tasksConsumed, 1)
+			atomic.AddInt64(&l.tasksRunning, 1)
+			l.doLaunch(tsk)
+			atomic.AddInt64(&l.tasksRunning, -1)
+		}()
 	}
 }
 
@@ -559,7 +562,7 @@ func (l *Launcher) sendTsk(tsk *Task) {
 // shutting down or processing the last task.
 func (l *Launcher) giveBackSlot() {
 	if l.stopCtx.Err() == nil && l.lastCtx.Err() == nil {
-		atomic.AddInt64(&l.tasksRunning, -1)
+		//atomic.AddInt64(&l.tasksRunning, -1)
 		l.slots <- 1
 	}
 	l.wg.Done()

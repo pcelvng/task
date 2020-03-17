@@ -43,7 +43,7 @@ func TestLauncher_Status(t *testing.T) {
 	nop.FakeMsg = []byte(`{"type":"test","info":"?wait-time=5s"}`)
 	l := NewLauncherFromBus(newTestWorker, c, p, &LauncherOptions{MaxInProgress: 100})
 	l.DoTasks()
-	time.Sleep(time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	sts := l.Stats()
 	if sts.TasksRunning != 100 {
 		t.Errorf("Tasks running should be 100 !=%d", sts.TasksRunning)
