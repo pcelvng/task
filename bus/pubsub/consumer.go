@@ -2,6 +2,8 @@ package pubsub
 
 import (
 	"context"
+	"errors"
+	"log"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -17,10 +19,10 @@ type Consumer struct {
 	sub    *pubsub.Subscription
 
 	// context for clean shutdown
-	ctx  context.Context
-	cncl context.CancelFunc
-
-	info info.Consumer
+	ctx     context.Context
+	cncl    context.CancelFunc
+	msgChan chan *pubsub.Message
+	info    info.Consumer
 }
 
 // NewConsumer creates a new consumer for reading messages from pubsub
@@ -30,6 +32,7 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 			Bus:   "pubsub",
 			Topic: o.Topic,
 		},
+		msgChan: make(chan *pubsub.Message),
 	}
 
 	c.client, err = o.newClient()
@@ -67,6 +70,19 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 		}
 	}
 
+	c.sub.ReceiveSettings.MaxOutstandingMessages = 1
+	c.sub.ReceiveSettings.Synchronous = true
+
+	go func() {
+		err := c.sub.Receive(c.ctx, func(ctx context.Context, m *pubsub.Message) {
+			c.msgChan <- m
+			// Message.ACK() called in Msg()
+		})
+		if err != context.Canceled {
+			log.Println(err)
+		}
+	}()
+
 	return c, nil
 }
 
@@ -78,23 +94,23 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 		// should not attempt to read if already stopped
 		return msg, true, nil
 	}
-
-	c.sub.ReceiveSettings.MaxOutstandingMessages = 1
-	c.sub.ReceiveSettings.Synchronous = true
-	cctx, cancel := context.WithCancel(c.ctx)
-	err = c.sub.Receive(cctx, func(ctx context.Context, m *pubsub.Message) {
-		msg = m.Data
+	select {
+	case m := <-c.msgChan:
+		if m == nil {
+			return msg, false, errors.New("nil pubsub message")
+		}
 		m.Ack()
-		c.info.Received++
-		cancel()
-	})
+		msg = m.Data
+	case <-c.ctx.Done():
+	}
+	c.info.Received++
 
 	return msg, done, err
 }
 
 // Once Stop has been called subsequent calls to Msg
 // should not block and immediately return with
-// msg == nil (or len == 0), done == true and err == nil.
+// msgChan == nil (or len == 0), done == true and err == nil.
 func (c *Consumer) Stop() (err error) {
 	if c.ctx.Err() != nil {
 		return nil
