@@ -14,11 +14,11 @@ import (
 // Option are the settings to connect to a pubsub project instance.
 type Option struct {
 	// host should only be set for emulator
-	Host           string `uri:"host"`
-	ProjectID      string `uri:"project"`
-	SubscriptionID string `uri:"subscription"`
-	Topic          string `uri:"topic" required:"true"`
-	JSONAuth       string `uri:"jsonauth"`
+	Host         string `uri:"host"`
+	ProjectID    string `uri:"project"`
+	Subscription string `uri:"subscription"`
+	Topic        string `uri:"topic" required:"true"`
+	JSONAuth     string `uri:"jsonauth"`
 	// if nil then the default nsq logger is used
 	Logger *log.Logger
 }
@@ -31,11 +31,11 @@ type Option struct {
 // jsonauth is the generated json string authorization settings for access to pubsub
 func NewOption(host, project, subscription, topic, jsonauth string) *Option {
 	o := &Option{
-		Host:           "", // only used for the emulator
-		ProjectID:      "project.id",
-		SubscriptionID: "default.topic.channel",
-		Topic:          "default.topic",
-		JSONAuth:       "",
+		Host:         "", // only used for the emulator
+		ProjectID:    "project.id",
+		Subscription: "default.topic.channel",
+		Topic:        "default.topic",
+		JSONAuth:     "",
 	}
 
 	if project != "" {
@@ -43,7 +43,7 @@ func NewOption(host, project, subscription, topic, jsonauth string) *Option {
 	}
 
 	if subscription != "" {
-		o.SubscriptionID = subscription
+		o.Subscription = subscription
 	}
 
 	if topic != "" {
@@ -71,10 +71,10 @@ func (o *Option) newClient() (*pubsub.Client, error) {
 
 func Topics(o *Option) ([]string, error) {
 	client, err := o.newClient()
-	defer client.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer client.Close()
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	q := client.Topics(ctx)
 	topics := make([]string, 0)

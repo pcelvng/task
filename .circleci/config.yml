@@ -3,7 +3,9 @@ version: 2
 jobs:  
   build:
     docker:
-      - image: circleci/golang:1.13
+      - image: circleci/golang:1.14
+      - image: bigtruedata/gcloud-pubsub-emulator
+        command: "start --host-port=0.0.0.0:8085"
       - image: nsqio/nsq
         command: "./nsqd --broadcast-address=127.0.0.1 --http-address=127.0.0.1:4151 --tcp-address=127.0.0.1:4150 --lookupd-tcp-address=127.0.0.1:4160 --data-path=/var/opt --mem-queue-size=1000 & ./nsqlookupd --broadcast-address=127.0.0.1"
     working_directory: /go/src/github.com/pcelvng/task

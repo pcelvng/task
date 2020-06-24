@@ -57,11 +57,11 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 	}
 
 	// get the subscription from the provided subscription name (id)
-	c.sub = c.client.Subscription(o.SubscriptionID)
+	c.sub = c.client.Subscription(o.Subscription)
 
 	// if the subscription does not exist, create the subscription
 	if ok, err := c.sub.Exists(c.ctx); !ok || err != nil {
-		c.sub, err = c.client.CreateSubscription(c.ctx, o.SubscriptionID, pubsub.SubscriptionConfig{
+		c.sub, err = c.client.CreateSubscription(c.ctx, o.Subscription, pubsub.SubscriptionConfig{
 			Topic:       topic,
 			AckDeadline: 10 * time.Second,
 		})
@@ -78,7 +78,7 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 			c.msgChan <- m
 			// Message.ACK() called in Msg()
 		})
-		if err != context.Canceled {
+		if err != nil && err != context.Canceled {
 			log.Println(err)
 		}
 	}()
