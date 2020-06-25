@@ -3,190 +3,74 @@ package nsq
 import (
 	"io/ioutil"
 	"log"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
+	"github.com/hydronica/trial"
 	gonsq "github.com/nsqio/go-nsq"
 )
 
-// startup will try to start nsq. If successful
-// then nsqOn will bej set to true.
-var (
-	nsqdCmd    *exec.Cmd
-	lookupdCmd *exec.Cmd
-
-	nsqdPath             = "./test/nsqd"
-	nsqlookupdPath       = "./test/nsqlookupd"
-	darwinNsqdPath       = "./test/darwin_nsqd"
-	darwinNsqlookupdPath = "./test/darwin_nsqlookupd"
-)
-
 func TestNewConsumer(t *testing.T) {
-	// turn off nsq client logging
-	//logger := log.New(ioutil.Discard, "", 0)
-	opt := &Option{
-		// Logger:       logger,
-		// NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
-	}
-
-	c, err := NewConsumer("", "", opt)
-	if err == nil {
-		t.Fatal("err should not be nil")
-	}
-
-	// consumer is nil
-	if c != nil {
-		t.Error("consumer should be nil")
-	}
-}
-
-func TestConsumer_ConnectNoTopic(t *testing.T) {
-	// turn off nsq client logging
-	//logger := log.New(ioutil.Discard, "", 0)
-	opt := &Option{
-		// Logger:       logger,
-		// NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
-	}
-	topic := ""
-	channel := "testchannel"
-
-	c, err := NewConsumer(topic, channel, opt)
-
-	// err is not nil - invalid topic name
-	if err == nil {
-		t.Fatal("expected err but got nil")
-	}
-
-	// consumer is nil
-	if c != nil {
-		t.Error("consumer should be nil")
-	}
-}
-
-func TestConsumer_ConnectNoChannel(t *testing.T) {
-	// turn off nsq client logging
-	//logger := log.New(ioutil.Discard, "", 0)
-	opt := &Option{
-		// Logger:       logger,
-		// NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
-	}
-	topic := "testtopic"
-	channel := ""
-
-	c, err := NewConsumer(topic, channel, opt)
-
-	// err is not nil - invalid channel name
-	if err == nil {
-		t.Fatal("expected err but got nil")
-	}
-
-	// consumer is nil
-	if c != nil {
-		t.Error("consumer should be nil")
-	}
-}
-
-func TestConsumer_Connect(t *testing.T) {
 	if !nsqActive {
-		t.Skip("nsq not running")
+		t.Skip("SKIP: nsq not running")
 	}
-	// turn off nsq client logging
 	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Option{
-		Logger: logger,
-		// NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
+	type input struct {
+		topic   string
+		channel string
+		opts    Option
 	}
-	topic := "testtopic"
-	channel := "testchannel"
-
-	c, err := NewConsumer(topic, channel, opt)
-
-	// err - nil
-	if err != nil {
-		t.Errorf("err should be nil got '%v' instead\n", err.Error())
+	fn := func(in trial.Input) (interface{}, error) {
+		v := in.Interface().(input)
+		c, err := NewConsumer(v.topic, v.channel, &v.opts)
+		isValid := c != nil
+		if isValid && err == nil {
+			err = c.Stop()
+		}
+		return isValid, err
 	}
-
-	// consumer - not nil
-	if c == nil {
-		t.Fatal("consumer should not be nil")
+	cases := trial.Cases{
+		"blank": {
+			Input:     input{},
+			ShouldErr: true,
+			//Expected:  true,
+		},
+		"no topic": {
+			Input:     input{channel: "testchannel"},
+			ShouldErr: true,
+		},
+		"no channel": {
+			Input:     input{topic: "testtopic"},
+			ShouldErr: true,
+		},
+		"connect": {
+			Input: input{
+				topic:   "topic",
+				channel: "test",
+				opts:    Option{Logger: logger},
+			},
+			Expected: true,
+		},
+		"bad nsqds": { // bad port
+			Input: input{
+				topic:   "testtopic",
+				channel: "test",
+				opts:    Option{Logger: logger, NSQdAddrs: []string{"localhost:4000"}},
+			},
+			ShouldErr: true,
+		},
+		"nsqds": {
+			Input: input{
+				topic:   "topic",
+				channel: "test",
+				opts:    Option{Logger: logger, NSQdAddrs: []string{"localhost:4150"}},
+			},
+			Expected: true,
+		},
 	}
-
-	// c.consumer - not nil
-	if c.consumer == nil {
-		t.Fatal("nsq consumer should not be nil")
-	}
-
-	// stop - no error
-	if err := c.Stop(); err != nil {
-		t.Fatalf("bad shutdown: %v\n", err)
-	}
-}
-
-func TestConsumer_ConnectNSQdsBad(t *testing.T) {
-	// TEST BAD NSQD
-	// turn off nsq client logging
-	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Option{
-		Logger:    logger,
-		NSQdAddrs: []string{"localhost:4000"},
-		// LookupdAddrs: []string{"localhost:4160"},
-	}
-	topic := "testtopic"
-	channel := "testchannel"
-
-	c, err := NewConsumer(topic, channel, opt)
-
-	// err - not nil
-	if err == nil {
-		t.Fatal("expected err but got nil")
-	}
-
-	// consumer - nil
-	if c != nil {
-		t.Error("consumer should be nil")
-	}
-}
-
-func TestConsumer_ConnectNSQds(t *testing.T) {
-	if !nsqActive {
-		t.Skip("nsq not running")
-	}
-	// TEST GOOD NSQD
-	// turn off nsq client logging
-	logger := log.New(ioutil.Discard, "", 0)
-	opt := &Option{
-		Logger:    logger,
-		NSQdAddrs: []string{"localhost:4150"},
-		// LookupdAddrs: []string{"localhost:4160"},
-	}
-	topic := "testtopic"
-	channel := "testchannel"
-
-	c, err := NewConsumer(topic, channel, opt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// check nsq consumer (should not be nil)
-	if c.consumer == nil {
-		t.Errorf("nsq consumer should not be nil")
-	}
-
-	// check that consumer shuts down safely - even without
-	// successfully connecting
-	if err := c.Stop(); err != nil {
-		t.Fatalf("bad shutdown: %v\n", err)
-	}
+	trial.New(fn, cases).SubTest(t)
 }
 
 func TestConsumer_ConnectLookupdsBad(t *testing.T) {
@@ -494,94 +378,6 @@ func TestConsumer_Msg(t *testing.T) {
 		t.Fatalf("bad shutdown: %v\n", err)
 	}
 
-}
-
-func StartNsqd() error {
-	// check for nsqd in the path
-	var err error
-	if runtime.GOOS == "darwin" {
-		_, err = exec.LookPath(darwinNsqdPath)
-	} else {
-		_, err = exec.LookPath(nsqdPath)
-	}
-	if err != nil {
-		return err // don't attempt full tests
-	}
-
-	// start nsqd
-	cmd := exec.Command(
-		"nsqd",
-		"--lookupd-tcp-address=127.0.0.1:4160",
-		"--http-address=127.0.0.1:4151",
-		"--tcp-address=127.0.0.1:4150",
-		"--broadcast-address=127.0.0.1",
-	)
-	cmd.Start()
-	nsqdCmd = cmd
-
-	// wait a sec for nsqd to start up
-	tckr := time.NewTicker(time.Millisecond * 50)
-	<-tckr.C
-	return nil
-}
-
-func StopNsqd() error {
-	if nsqdCmd != nil {
-		nsqdCmd.Process.Signal(syscall.SIGINT)
-	}
-	nsqdCmd.Wait()
-
-	// remove .dat files
-	matches, err := filepath.Glob("*.dat")
-	if err != nil {
-		return err
-	}
-
-	for _, match := range matches {
-		cmd := exec.Command("rm", match)
-		cmd.Run()
-	}
-
-	return nil
-}
-
-func StartLookupd() error {
-	// check for nsqlookupd in the path
-	var err error
-	if runtime.GOOS == "darwin" {
-		_, err = exec.LookPath(darwinNsqlookupdPath)
-	} else {
-		_, err = exec.LookPath(nsqlookupdPath)
-	}
-	if err != nil {
-		return err // don't attempt full tests
-	}
-
-	// start nsqd
-	cmd := exec.Command(
-		"nsqlookupd",
-		"--broadcast-address=127.0.0.1",
-	)
-	cmd.Start()
-	lookupdCmd = cmd
-
-	// wait a for lookupd to start up
-	tckr := time.NewTicker(time.Millisecond * 50)
-	<-tckr.C
-
-	return nil
-}
-
-func StopLookupd() error {
-	if lookupdCmd != nil {
-		lookupdCmd.Process.Signal(syscall.SIGINT)
-	}
-
-	if err := lookupdCmd.Wait(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func AddTasks(topic string, tskCnt int) error {

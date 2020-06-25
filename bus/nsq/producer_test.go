@@ -12,13 +12,14 @@ import (
 var nsqActive bool
 
 func TestMain(t *testing.M) {
-	if r, err := http.Get("127.0.0.1:4151/info"); err != nil || r.StatusCode != 200 {
+	if r, err := http.Get("http://127.0.0.1:4151/info"); err != nil || r.StatusCode != 200 {
+
 		log.Println("nsqd not running")
 	} else {
 		nsqActive = true
 	}
 
-	if r, err := http.Get("127.0.0.1:4161/info"); err != nil || r.StatusCode != 200 {
+	if r, err := http.Get("http://127.0.0.1:4161/info"); err != nil || r.StatusCode != 200 {
 		log.Println("nsqlookupd not running")
 		nsqActive = false
 	}
