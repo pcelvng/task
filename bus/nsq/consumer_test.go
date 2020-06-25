@@ -14,7 +14,7 @@ import (
 
 func TestNewConsumer(t *testing.T) {
 	if !nsqActive {
-		t.Skip("SKIP: nsq not running")
+		t.Skip(skipNSQ)
 	}
 	logger := log.New(ioutil.Discard, "", 0)
 	type input struct {
@@ -116,7 +116,7 @@ func TestConsumer_ConnectLookupdsBad(t *testing.T) {
 
 func TestConsumer_ConnectLookupds(t *testing.T) {
 	if !nsqActive {
-		t.Skip("nsq not running")
+		t.Skip(skipNSQ)
 	}
 	// TEST GOOD LOOKUPD
 	// Note: nsq will not return an error if a connection to
@@ -160,7 +160,7 @@ func TestConsumer_ConnectLookupds(t *testing.T) {
 
 func TestConsumer_Msg(t *testing.T) {
 	if !nsqActive {
-		t.Skip("nsq not running")
+		t.Skip(skipNSQ)
 	}
 	// TEST MSG
 	//

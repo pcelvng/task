@@ -9,19 +9,18 @@ import (
 	"testing"
 )
 
+var skipNSQ string
 var nsqActive bool
 
 func TestMain(t *testing.M) {
 	if r, err := http.Get("http://127.0.0.1:4151/info"); err != nil || r.StatusCode != 200 {
-
-		log.Println("nsqd not running")
+		log.Println("\x1b[1;34mSKIP: nsq not running\x1b[0m")
 	} else {
 		nsqActive = true
 	}
 
 	if r, err := http.Get("http://127.0.0.1:4161/info"); err != nil || r.StatusCode != 200 {
-		log.Println("nsqlookupd not running")
-		nsqActive = false
+		log.Println("\x1b[1;34mSKIP: nsqlookupd not running\x1b[0m")
 	}
 	t.Run()
 }
@@ -43,7 +42,7 @@ func TestNewProducer(t *testing.T) {
 
 func TestProducer(t *testing.T) {
 	if !nsqActive {
-		t.Skip("nsq not running")
+		t.Skip(skipNSQ)
 	}
 	// connect with bad address
 	logger := log.New(ioutil.Discard, "", 0)
@@ -145,7 +144,7 @@ func TestProducer(t *testing.T) {
 
 func TestProducer_Race(t *testing.T) {
 	if !nsqActive {
-		t.Skip("nsq not running")
+		t.Skip(skipNSQ)
 	}
 	// connect to multiple good nsqds
 	topic := "test-producer-topic"
