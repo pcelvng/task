@@ -43,14 +43,15 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 	// check for the topic if it doesn't exist create it to use for the subscription
 	// create context for clean shutdown
 	c.ctx, c.cncl = context.WithCancel(context.Background())
+	ctx, _ := context.WithTimeout(c.ctx, 5*time.Second)
 
 	topic := c.client.Topic(o.Topic)
-	exists, err := topic.Exists(c.ctx)
+	exists, err := topic.Exists(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		topic, err = c.client.CreateTopic(c.ctx, o.Topic)
+		topic, err = c.client.CreateTopic(ctx, o.Topic)
 		if err != nil {
 			return nil, err
 		}
@@ -60,8 +61,8 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 	c.sub = c.client.Subscription(o.Subscription)
 
 	// if the subscription does not exist, create the subscription
-	if ok, err := c.sub.Exists(c.ctx); !ok || err != nil {
-		c.sub, err = c.client.CreateSubscription(c.ctx, o.Subscription, pubsub.SubscriptionConfig{
+	if ok, err := c.sub.Exists(ctx); !ok || err != nil {
+		c.sub, err = c.client.CreateSubscription(ctx, o.Subscription, pubsub.SubscriptionConfig{
 			Topic:       topic,
 			AckDeadline: 10 * time.Second,
 		})

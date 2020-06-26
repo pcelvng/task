@@ -12,7 +12,23 @@ import (
 	"github.com/hydronica/trial"
 )
 
+var skipPubsub bool
+var skipText = "\x1b[1;34mSKIP: pubsub not running\x1b[0m"
+
+func TestMain(t *testing.M) {
+	opts := &Option{Host: "127.0.0.1:8085"}
+	_, err := Topics(opts)
+	if err != nil {
+		log.Println("pubsub not running", err)
+		skipPubsub = true
+	}
+	t.Run()
+}
+
 func TestNewConsumer(t *testing.T) {
+	if skipPubsub {
+		t.Skip(skipText)
+	}
 	fn := func(in trial.Input) (interface{}, error) {
 		opts := in.Interface().(*Option)
 		os.Setenv("PUBSUB_EMULATOR_HOST", "")
@@ -49,6 +65,9 @@ func TestNewConsumer(t *testing.T) {
 }
 
 func TestTopics(t *testing.T) {
+	if skipPubsub {
+		t.Skip(skipText)
+	}
 	opts := &Option{Host: "127.0.0.1:8085"}
 	s, err := Topics(opts)
 	if err != nil {
@@ -60,6 +79,9 @@ func TestTopics(t *testing.T) {
 }
 
 func TestProducer(t *testing.T) {
+	if skipPubsub {
+		t.Skip(skipText)
+	}
 	opts := &Option{Host: "127.0.0.1:8085"}
 	producer, err := opts.NewProducer()
 	if err != nil {
@@ -99,6 +121,9 @@ func TestProducer(t *testing.T) {
 }
 
 func TestConsumer_Msg(t *testing.T) {
+	if skipPubsub {
+		t.Skip(skipText)
+	}
 	// setup
 	opts := &Option{
 		Host:         "127.0.0.1:8085",
