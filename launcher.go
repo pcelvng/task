@@ -523,7 +523,12 @@ func (l *Launcher) doLaunch(tsk *Task) {
 			for k, v := range m.GetMeta() {
 				data[k] = append(data[k], v...)
 			}
-			tsk.Meta = data.Encode()
+			s, err := url.QueryUnescape(data.Encode())
+			if err != nil {
+				tsk.Meta = data.Encode()
+			} else {
+				tsk.Meta = s
+			}
 		}
 		close(doneChan)
 	}()

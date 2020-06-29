@@ -57,20 +57,21 @@ func (p *Producer) Send(topic string, msg []byte) (err error) {
 
 	defer t.Stop()
 
-	ok, err := t.Exists(p.ctx)
+	ctx, _ := context.WithTimeout(p.ctx, 5*time.Second)
+	ok, err := t.Exists(ctx)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		t, err = p.client.CreateTopic(p.ctx, topic)
+		t, err = p.client.CreateTopic(ctx, topic)
 		if err != nil {
 			return err
 		}
 	}
 
 	// publish message to pubsub
-	res := t.Publish(p.ctx, &ps.Message{Data: msg})
-	_, err = res.Get(p.ctx)
+	res := t.Publish(ctx, &ps.Message{Data: msg})
+	_, err = res.Get(ctx)
 	if err != nil {
 		return err
 	}
