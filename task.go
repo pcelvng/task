@@ -1,6 +1,7 @@
 package task
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 
@@ -128,8 +129,11 @@ func (t *Task) End(r Result, msg string) time.Time {
 
 // JSONBytes returns the task json bytes.
 func (t *Task) JSONBytes() []byte {
-	b, _ := json.Marshal(t)
-	return b
+	buf := bytes.NewBuffer([]byte{})
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	enc.Encode(t)
+	return bytes.TrimRight(buf.Bytes(), "\n")
 }
 
 // String returns json string.
