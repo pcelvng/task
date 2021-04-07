@@ -75,12 +75,15 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 	c.sub.ReceiveSettings.Synchronous = true
 
 	go func() {
-		err := c.sub.Receive(c.ctx, func(ctx context.Context, m *pubsub.Message) {
-			c.msgChan <- m
-			// Message.ACK() called in Msg()
-		})
-		if err != nil && err != context.Canceled {
-			log.Println(err)
+		fn := func(ctx context.Context, m *pubsub.Message) { c.msgChan <- m }
+		for ; ; time.Sleep(10 * time.Second) {
+			err := c.sub.Receive(c.ctx, fn)
+			if err != nil {
+				log.Println(err)
+				if err != context.Canceled {
+					return
+				}
+			}
 		}
 	}()
 
