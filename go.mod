@@ -5,6 +5,7 @@ go 1.13
 require (
 	cloud.google.com/go/pubsub v1.10.1
 	github.com/bitly/go-hostpool v0.1.0
+	github.com/golang/snappy v0.0.3 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/hydronica/trial v0.5.0
 	github.com/jarcoal/httpmock v1.0.8

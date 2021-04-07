@@ -3,6 +3,7 @@ package nsq
 import (
 	"io/ioutil"
 	"log"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -134,6 +135,12 @@ func TestConsumer_ConnectLookupds(t *testing.T) {
 	topic := "testtopic"
 	channel := "testchannel"
 
+	// create test topic just in case
+	_, err := http.Post("http://127.0.0.1:4151/topic/create?topic="+topic, "", nil)
+	if err != nil {
+		log.Println(err)
+	}
+
 	c, err := NewConsumer(topic, channel, opt)
 	if err != nil {
 		t.Fatal(err)
@@ -144,11 +151,8 @@ func TestConsumer_ConnectLookupds(t *testing.T) {
 		t.Errorf("nsq consumer should not be nil")
 	}
 
-	// check that there are no connections (since it's not a valid port)
-	stats := c.consumer.Stats()
-	expected := 1
-	if stats.Connections != expected {
-		t.Errorf("expected '%v' but got '%v'", expected, stats.Connections)
+	if stats := c.consumer.Stats(); stats.Connections != 1 {
+		t.Errorf("expected lookupd connections: %v", stats)
 	}
 
 	// check that consumer shuts down safely - even without
