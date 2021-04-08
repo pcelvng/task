@@ -80,7 +80,7 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 			err := c.sub.Receive(c.ctx, fn)
 			if err != nil {
 				log.Println(err)
-				if err != context.Canceled {
+				if err == context.Canceled {
 					return
 				}
 			}
