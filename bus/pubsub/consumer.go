@@ -73,17 +73,22 @@ func (o *Option) NewConsumer() (c *Consumer, err error) {
 
 	c.sub.ReceiveSettings.MaxOutstandingMessages = 1
 	c.sub.ReceiveSettings.Synchronous = true
+	t, ok := c.ctx.Deadline()
+	log.Printf("has deadline: %v, %v", ok, t)
 
 	go func() {
 		fn := func(ctx context.Context, m *pubsub.Message) { c.msgChan <- m }
 		for ; ; time.Sleep(10 * time.Second) {
 			err := c.sub.Receive(c.ctx, fn)
 			if err != nil {
-				log.Println(err)
+				t, _ := c.ctx.Deadline()
+				log.Printf("Dealine: %v, Err: %v", t, err)
 				if err == context.Canceled {
+					log.Println("pubsub consumer closed")
 					return
 				}
 			}
+			log.Println("restarting consumer func")
 		}
 	}()
 
