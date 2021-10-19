@@ -521,7 +521,7 @@ func (l *Launcher) doLaunch(tsk *Task) {
 		if m, ok := worker.(meta); ok {
 			data, _ := url.ParseQuery(tsk.Meta)
 			for k, v := range m.GetMeta() {
-				data[k] = append(data[k], v...)
+				data[k] = v
 			}
 			s, err := url.QueryUnescape(data.Encode())
 			if err != nil {

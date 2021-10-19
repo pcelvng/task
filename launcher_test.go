@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"testing"
 	"time"
 
@@ -71,54 +72,75 @@ func TestLauncher_Status(t *testing.T) {
 
 }
 
-type tMetaWorker struct{ Meta }
+type tMetaWorker struct {
+	Info string
+	Meta
+}
 
 var _ meta = tMetaWorker{}
 
 func (w tMetaWorker) DoTask(_ context.Context) (Result, string) {
-	w.SetMeta("test-key", "value")
+	u, err := url.Parse(w.Info)
+	if err != nil {
+		return Failed(err)
+	}
+	for k, v := range u.Query() {
+		w.Meta.SetMeta(k, v...)
+	}
+
 	return Completed("done")
 }
 
 func TestDoLaunch(t *testing.T) {
-	fn := func(in trial.Input) (interface{}, error) {
+	wrkFn := func(info string) Worker {
+		return tMetaWorker{Info: info, Meta: make(map[string][]string)}
+	}
+	type input struct {
+		meta string
+		info string
+	}
+	fn := func(i trial.Input) (interface{}, error) {
+		// Create a worker that converts converts all info data
+		// into meta. This test is designed to test maintaining
+		// the meta data across tasks without duplicating them.
+		in := i.Interface().(input)
 		p, err := nop.NewProducer("")
 		if err != nil {
 			return nil, err
 		}
+
 		launcher := &Launcher{
 			stopCtx:  context.Background(),
 			lastCtx:  context.Background(),
 			slots:    make(chan int, 10),
 			opt:      NewLauncherOptions(""),
 			producer: p,
-			newWkr: func(_ string) Worker {
-				return tMetaWorker{Meta: make(map[string][]string)}
-			},
+			newWkr:   wrkFn,
 		}
 		launcher.wg.Add(1)
-		tsk := &Task{Meta: in.String()}
+		tsk := &Task{Info: in.info, Meta: in.meta}
 		launcher.doLaunch(tsk)
 		if err := json.Unmarshal([]byte(p.Messages["done"][0]), tsk); err != nil {
 			return nil, err
 		}
-		//remove timestamps for comparison
-		tsk.Created, tsk.Started, tsk.Ended = "", "", ""
-		tsk.started, tsk.ended = time.Time{}, time.Time{}
-		return tsk, nil
+		return tsk.Meta, nil
 	}
 	cases := trial.Cases{
-		"meta is saved": {
-			Input:    "",
-			Expected: &Task{Msg: "done", Result: CompleteResult, Meta: "test-key=value"},
+		"empty": {
+			Input:    input{meta: "", info: ""},
+			Expected: "",
 		},
-		"preserve tm meta": {
-			Input:    "meta=value",
-			Expected: &Task{Msg: "done", Result: CompleteResult, Meta: "meta=value&test-key=value"},
+		"preserve from task": {
+			Input:    input{meta: "meta=value"},
+			Expected: "meta=value",
 		},
 		"append meta": {
-			Input:    "test-key=master",
-			Expected: &Task{Msg: "done", Result: CompleteResult, Meta: "test-key=master&test-key=value"},
+			Input:    input{meta: "test-key=master", info: "?worker=abc"},
+			Expected: "test-key=master&worker=abc",
+		},
+		"override meta": {
+			Input:    input{meta: "key=abc&name=test", info: "?key=xyz&count=10"},
+			Expected: "count=10&key=xyz&name=test",
 		},
 	}
 	trial.New(fn, cases).SubTest(t)
