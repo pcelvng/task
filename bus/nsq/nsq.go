@@ -65,3 +65,33 @@ type topicResponse struct {
 		Topics []string `json:"topics"`
 	} `json:"data"`
 }
+
+func (o *Option) createTopicIfNotFound(topic string) error {
+	if len(o.LookupdAddrs) == 0 {
+		return fmt.Errorf("lookupd host required")
+	}
+	resp, err := http.Get(fmt.Sprintf("http://%v/lookup?topic=%s", o.LookupdAddrs[0], topic))
+	if err != nil || resp.StatusCode == http.StatusOK {
+		return err // topic found or issue with request
+	}
+	// lookup nodes
+	type Producer struct {
+		Address string `json:"broadcast_address"`
+		Port    int    `json:"http_port"`
+	}
+	data := struct {
+		Producer []Producer `json:"producers"`
+	}{}
+	resp, _ = http.Get(fmt.Sprintf("http://%v/nodes", o.LookupdAddrs[0]))
+	b, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(b, &data)
+	for _, nsq := range data.Producer {
+		resp, _ := http.Post(fmt.Sprintf("http://%s:%d/topic/create?topic=%s", nsq.Address, nsq.Port, topic), "", nil)
+		if resp.StatusCode != http.StatusOK {
+			err = fmt.Errorf("%v: %v", nsq, resp.Status)
+			log.Println(err)
+		}
+	}
+
+	return err
+}
