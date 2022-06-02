@@ -141,10 +141,14 @@ func (c *Consumer) connect(topic, channel string) error {
 	// or attempt to connect to nsqds (if provided)
 	// if neither is provided attempt to connect to localhost
 	if len(c.opt.LookupdAddrs) > 0 {
+		if err := c.opt.createTopicIfNotFound(topic); err != nil {
+			log.Println(err)
+		}
 		err = consumer.ConnectToNSQLookupds(c.opt.LookupdAddrs)
 		if err != nil {
 			return err
 		}
+
 	} else if len(c.opt.NSQdAddrs) > 0 {
 		err = consumer.ConnectToNSQDs(c.opt.NSQdAddrs)
 		if err != nil {
