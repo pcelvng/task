@@ -61,6 +61,14 @@ func Failf(format string, a ...interface{}) (Result, string) {
 	return ErrResult, fmt.Sprintf(format, a...)
 }
 
+func Warn(format string, a ...interface{}) (Result, string) {
+	return WarnResult, fmt.Sprintf(format, a...)
+}
+
+func Alert(format string, a ...interface{}) (Result, string) {
+	return AlertResult, fmt.Sprintf(format, a...)
+}
+
 // InvalidWorker is a helper function to indicate an error when calling MakerWorker
 func InvalidWorker(format string, a ...interface{}) Worker {
 	return &invalidWorker{
