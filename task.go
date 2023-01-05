@@ -89,6 +89,7 @@ func IsZero(t Task) bool {
 
 type Task struct {
 	Type    string `json:"type"` // identifier that indicates the type of worker that knows how to complete the task
+	Job     string `json:"job,omitempty"`
 	Info    string `json:"info"` // information that tells the worker the specifics of executing the task
 	Created string `json:"created,omitempty"`
 	ID      string `json:"id,omitempty"`   // unique report id
@@ -146,4 +147,6 @@ type Result string
 const (
 	CompleteResult Result = "complete" // completed successfully (as far as the worker can tell)
 	ErrResult      Result = "error"    // not completed successfully (the task outcome is bad)
+	AlertResult    Result = "alert"    // no retry and an alert should be sent
+	WarnResult     Result = "warn"     // non-critical failure with no retry
 )
