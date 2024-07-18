@@ -23,7 +23,7 @@ func TestNewConsumer(t *testing.T) {
 
 func TestConsumer_Msg(t *testing.T) {
 	type Output struct {
-		msg  []byte
+		msg  string
 		done bool
 	}
 	fn := func(args ...interface{}) (interface{}, error) {
@@ -33,12 +33,16 @@ func TestConsumer_Msg(t *testing.T) {
 			return Output{}, err
 		}
 		msg, done, err := c.Msg()
-		return Output{msg, done}, err
+		return Output{string(msg), done}, err
 	}
 
 	trial.New(fn, trial.Cases{
 		"default": {
 			Input:    "",
+			Expected: Output{msg: FakeMsg},
+		},
+		"repeat": {
+			Input:    Repeat,
 			Expected: Output{msg: FakeMsg},
 		},
 		"keyword: msg_err": {
@@ -48,7 +52,6 @@ func TestConsumer_Msg(t *testing.T) {
 		"keyword: msg_done": {
 			Input: MsgDone,
 			Expected: Output{
-				msg:  nil,
 				done: true,
 			},
 		},
@@ -63,7 +66,7 @@ func TestConsumer_Msg(t *testing.T) {
 }
 
 func TestConsumer_Info(t *testing.T) {
-	c, _ := NewConsumer("")
+	c, _ := NewConsumer("repeat")
 	for i := 0; i < 10; i++ {
 		c.Msg()
 	}

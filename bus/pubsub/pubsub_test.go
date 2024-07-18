@@ -29,15 +29,14 @@ func TestNewConsumer(t *testing.T) {
 	if skipPubsub {
 		t.Skip(skipText)
 	}
-	fn := func(in trial.Input) (interface{}, error) {
-		opts := in.Interface().(*Option)
+	fn := func(opts *Option) (bool, error) {
 		os.Setenv("PUBSUB_EMULATOR_HOST", "")
 
 		c, err := opts.NewConsumer()
 		return c != nil, err
 	}
 
-	cases := trial.Cases{
+	cases := trial.Cases[*Option, bool]{
 		"local host": {
 			Input:    NewOption("127.0.0.1:8085", "test", "topic1-sub", "topic", ""),
 			Expected: true,
