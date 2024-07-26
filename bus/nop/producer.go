@@ -39,7 +39,7 @@ type Producer struct {
 	// - "send_err" - returns err when Producer.Send() is called.
 	// - "stop_err" - returns err on Stop() method call
 	Mock     string
-	Messages map[string][]string // [topic]Messages
+	Messages map[string][]string // [topic]messages
 	Stats    info.Producer
 	mu       sync.Mutex
 }

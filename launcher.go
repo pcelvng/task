@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -9,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/pcelvng/task/bus"
 	"github.com/pcelvng/task/bus/info"
@@ -69,8 +72,10 @@ type LauncherOptions struct {
 	// in progress at one time.
 	MaxInProgress uint `toml:"max_in_progress" commented:"true" comment:"maximum number of workers within the application at one time"`
 
+	TaskLimit int `toml:"task-limit" commented:"true" comment:"tasks allowed be processed in an hour"`
+
 	// WorkerKillTime is how long the Launcher will
-	// wait for a forced-shutdown worker to cleanup.
+	// wait for a forced-shutdown worker to clean up.
 	WorkerKillTime time.Duration `toml:"worker_kill_time" commented:"true" comment:"how long the application will wait for a task to finish before shutting down when being forced to shut down"`
 
 	// LifetimeWorkers - maximum number of tasks the
@@ -145,9 +150,8 @@ func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *L
 		opt.DoneTopic = defaultDoneTopic
 	}
 
-	lgr := log.New(os.Stderr, "", log.LstdFlags)
 	if opt.Logger != nil {
-		lgr = opt.Logger
+		opt.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
 	// make sure maxInProgress is at least 1
@@ -196,11 +200,6 @@ func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *L
 	// been received and is currently being processed.
 	lastCtx, lastCncl := context.WithCancel(context.Background())
 
-	// make sure logger is not nil
-	if opt.Logger == nil {
-		opt.Logger = log.New(os.Stderr, "", log.LstdFlags)
-	}
-
 	// unmatching task type handling
 	typeHandling := ""
 	if opt.IgnoreBadType {
@@ -213,15 +212,24 @@ func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *L
 	// warn if typeHandling is set and
 	// a task type is not provided.
 	if typeHandling != "" && opt.TaskType == "" {
-		lgr.Printf("NO WORKERS WILL BE LAUNCHED! task type handling is set to '%v' but no task type is provided", typeHandling)
+		opt.Logger.Printf("NO WORKERS WILL BE LAUNCHED! task type handling is set to '%v' but no task type is provided", typeHandling)
 	}
 
-	l := &Launcher{
+	l := rate.Limit(opt.TaskLimit / 3600.0)               // converts tasks/hour to tasks/second
+	limiter := rate.NewLimiter(l, int(opt.MaxInProgress)) // let each in worker can start with a task
+
+	// disable the limiter if not used by setting the burst to zero
+	if opt.TaskLimit == 0 {
+		limiter = nil
+	}
+
+	return &Launcher{
 		initTime:      time.Now(),
 		isInitialized: true,
 		consumer:      c,
 		producer:      p,
 		opt:           opt,
+		rLimit:        limiter,
 		newWkr:        newWkr,
 		lgr:           opt.Logger,
 		taskType:      opt.TaskType,
@@ -237,8 +245,6 @@ func NewLauncherFromBus(newWkr NewWorker, c bus.Consumer, p bus.Producer, opt *L
 		slots:         slots,
 		closeTimeout:  workerTimeout,
 	}
-
-	return l
 }
 
 // Launcher handles the heavy lifting of worker lifecycle, general
@@ -264,6 +270,7 @@ type Launcher struct {
 	producer     bus.Producer
 	newWkr       NewWorker // initializing workers
 	lgr          *log.Logger
+	rLimit       *rate.Limiter
 	taskType     string // registered task type; used for identifying the worker and handling task types that do not match.
 	typeHandling string // how to handle unmatching task types: one of "reject", "ignore"
 
@@ -350,8 +357,8 @@ func (l *Launcher) Stats() LauncherStats {
 	finishedTasks := createdTasks - activeTasks
 	resp := LauncherStats{
 		RunTime:       time.Now().Sub(l.initTime).String(),
-		TasksConsumed: l.tasksConsumed,
-		TasksRunning:  l.tasksRunning,
+		TasksConsumed: atomic.LoadInt64(&l.tasksConsumed),
+		TasksRunning:  atomic.LoadInt64(&l.tasksRunning),
 		Producer:      l.producer.Info(),
 		Consumer:      l.consumer.Info(),
 	}
@@ -460,22 +467,28 @@ func (l *Launcher) next() {
 	}
 
 	tsk, err := NewFromBytes(tskB)
-	if err != nil {
-		l.log(err.Error())
+	if err != nil || tsk == nil {
+		l.log(err)
 		l.giveBackSlot()
 
 		return
 	}
+	if l.rLimit != nil {
+		err := l.rLimit.Wait(l.stopCtx)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			log.Println(err)
+			l.giveBackSlot()
 
-	// launch worker and do task
-	if tsk != nil {
-		go func() {
-			atomic.AddInt64(&l.tasksConsumed, 1)
-			atomic.AddInt64(&l.tasksRunning, 1)
-			l.doLaunch(tsk)
-			atomic.AddInt64(&l.tasksRunning, -1)
-		}()
+			return
+		}
 	}
+	// launch worker and do task
+	go func() {
+		atomic.AddInt64(&l.tasksConsumed, 1)
+		atomic.AddInt64(&l.tasksRunning, 1)
+		l.doLaunch(tsk)
+		atomic.AddInt64(&l.tasksRunning, -1)
+	}()
 }
 
 // doLaunch will safely handle the wait
@@ -574,7 +587,7 @@ func (l *Launcher) giveBackSlot() {
 }
 
 // log is the central point of operational logging.
-func (l *Launcher) log(msg string) {
+func (l *Launcher) log(msg any) {
 	l.lgr.Println(msg)
 }
 

@@ -1,13 +1,11 @@
 package pubsub
 
 import (
-	"context"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/hydronica/trial"
 )
@@ -15,8 +13,10 @@ import (
 var skipPubsub bool
 var skipText = "\x1b[1;34mSKIP: pubsub not running\x1b[0m"
 
+const pubsub_host = "127.0.0.1:8681"
+
 func TestMain(t *testing.M) {
-	opts := &Option{Host: "127.0.0.1:8085"}
+	opts := &Option{Host: pubsub_host, ProjectID: "task-test"}
 	_, err := Topics(opts)
 	if err != nil {
 		log.Println("pubsub not running", err)
@@ -29,29 +29,30 @@ func TestNewConsumer(t *testing.T) {
 	if skipPubsub {
 		t.Skip(skipText)
 	}
-	fn := func(in trial.Input) (interface{}, error) {
-		opts := in.Interface().(*Option)
+	fn := func(opts *Option) (bool, error) {
 		os.Setenv("PUBSUB_EMULATOR_HOST", "")
 
 		c, err := opts.NewConsumer()
 		return c != nil, err
 	}
 
-	cases := trial.Cases{
+	cases := trial.Cases[*Option, bool]{
 		"local host": {
-			Input:    NewOption("127.0.0.1:8085", "test", "topic1-sub", "topic", ""),
+			Input:    NewOption(pubsub_host, "test", "topic1-sub", "topic", ""),
 			Expected: true,
 		},
 		"missing topic": {
 			Input: &Option{
-				Host: "127.0.0.1:8085",
+				Host:      pubsub_host,
+				ProjectID: "task-test",
 			},
 			ShouldErr: true,
 		},
 		"missing subscription": {
 			Input: &Option{
-				Host:  "127.0.0.1:8085",
-				Topic: "topic1",
+				Host:      pubsub_host,
+				ProjectID: "task-test",
+				Topic:     "topic1",
 			},
 			ShouldErr: true,
 		},
@@ -68,7 +69,7 @@ func TestTopics(t *testing.T) {
 	if skipPubsub {
 		t.Skip(skipText)
 	}
-	opts := &Option{Host: "127.0.0.1:8085"}
+	opts := &Option{Host: pubsub_host, ProjectID: "task-test"}
 	s, err := Topics(opts)
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +83,7 @@ func TestProducer(t *testing.T) {
 	if skipPubsub {
 		t.Skip(skipText)
 	}
-	opts := &Option{Host: "127.0.0.1:8085"}
+	opts := &Option{Host: pubsub_host, ProjectID: "task-test"}
 	producer, err := opts.NewProducer()
 	if err != nil {
 		log.Fatal("new", err)
@@ -126,8 +127,9 @@ func TestConsumer_Msg(t *testing.T) {
 	}
 	// setup
 	opts := &Option{
-		Host:         "127.0.0.1:8085",
+		Host:         pubsub_host,
 		Topic:        "topic1",
+		ProjectID:    "task-test",
 		Subscription: "topic1-sub",
 	}
 	consumer, err := opts.NewConsumer()
@@ -164,7 +166,6 @@ func TestConsumer_Msg(t *testing.T) {
 	}
 
 	consumer, _ = opts.NewConsumer()
-	consumer.ctx, _ = context.WithTimeout(consumer.ctx, 5*time.Second)
 	tName = "read messages"
 	msgs := make([]string, 0)
 	for i := 0; i < msgCount; i++ {
