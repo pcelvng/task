@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gonsq "github.com/nsqio/go-nsq"
+
 	"github.com/pcelvng/task/bus/info"
 )
 
@@ -59,19 +60,21 @@ func NewConsumer(topic, channel string, opt *Option) (*Consumer, error) {
 }
 
 func (c *Consumer) checkMaxInFlight(topic, channel string) {
-	// consumer is consider locked up if
+	// consumer is considered locked up if
 	// 1. channel has depth
 	// 2. msqRequested > msqReceived // is waiting for a message
 	// 3. prevReceived = msgReceived // no new message has come in time limit
 	maxInFlight := 2
-	var prev int64
+	var prev, msgReq, msgRec int64
 	for ; ; time.Sleep(10 * time.Second) {
 		depth := getDepth(c.opt.LookupdAddrs, topic, channel)
-		if depth <= 0 || c.msgRequested <= c.msgReceived {
+		msgReq = atomic.LoadInt64(&c.msgRequested)
+		msgRec = atomic.LoadInt64(&c.msgReceived)
+		if depth <= 0 || msgReq <= msgRec {
 			continue
 		}
 
-		if prev == c.msgReceived {
+		if prev == msgRec {
 			//set maxinflight to 2, wait
 			log.Printf("lockup detected: maxInFlight set to %d", maxInFlight)
 			c.consumer.ChangeMaxInFlight(maxInFlight)
@@ -80,7 +83,7 @@ func (c *Consumer) checkMaxInFlight(topic, channel string) {
 				maxInFlight = 2
 			}
 		} else {
-			prev = c.msgReceived
+			prev = msgRec
 		}
 
 	}
@@ -256,7 +259,7 @@ func (c *Consumer) Msg() (msg []byte, done bool, err error) {
 	case <-c.ctx.Done():
 		done = true
 	}
-	c.info.Received++
+	atomic.AddInt32(&c.info.Received, 1)
 	return msg, done, err
 }
 
