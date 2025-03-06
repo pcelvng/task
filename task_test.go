@@ -3,6 +3,8 @@ package task
 import (
 	"testing"
 	"time"
+
+	"github.com/hydronica/trial"
 )
 
 func TestNew(t *testing.T) {
@@ -336,16 +338,18 @@ func TestTask_String(t *testing.T) {
 	// task to string plumbing test
 	tsk := &Task{
 		Type: "test-type",
-		Info: "test-info",
+		Info: "./test-info?arg1=abc&arg2=123",
+		Msg:  "<message>",
 	}
 
 	tskStr := tsk.JSONString()
 
 	// correct byte count
 	// {"type":"test-type","info":"test-info"}
-	expectedCnt := 39
-	if len(tskStr) != expectedCnt {
-		t.Errorf("expected '%v' but got '%v'\n", expectedCnt, len(tskStr))
+	expected := `{"type":"test-type","info":"./test-info?arg1=abc&arg2=123","msg":"<message>"}`
+	t.Log(tskStr)
+	if eq, diff := trial.Equal(expected, tskStr); !eq {
+		t.Errorf("FAIL: %v", diff)
 	}
 }
 

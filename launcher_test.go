@@ -110,8 +110,6 @@ func TestDoLaunch(t *testing.T) {
 		}
 
 		launcher := &Launcher{
-			stopCtx:  context.Background(),
-			lastCtx:  context.Background(),
 			slots:    make(chan int, 10),
 			opt:      NewLauncherOptions(""),
 			producer: p,
@@ -119,7 +117,7 @@ func TestDoLaunch(t *testing.T) {
 		}
 		launcher.wg.Add(1)
 		tsk := &Task{Info: in.info, Meta: in.meta}
-		launcher.doLaunch(tsk)
+		launcher.doLaunch(tsk, context.Background())
 		if err := json.Unmarshal([]byte(p.Messages["done"][0]), tsk); err != nil {
 			return nil, err
 		}
