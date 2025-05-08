@@ -22,16 +22,15 @@ func TestNewConsumer(t *testing.T) {
 		channel string
 		opts    Option
 	}
-	fn := func(in trial.Input) (interface{}, error) {
-		v := in.Interface().(input)
-		c, err := NewConsumer(v.topic, v.channel, &v.opts)
+	fn := func(in input) (bool, error) {
+		c, err := NewConsumer(in.topic, in.channel, &in.opts)
 		isValid := c != nil
 		if isValid && err == nil {
 			err = c.Stop()
 		}
 		return isValid, err
 	}
-	cases := trial.Cases{
+	cases := trial.Cases[input, bool]{
 		"blank": {
 			Input:     input{},
 			ShouldErr: true,

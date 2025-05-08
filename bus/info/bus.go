@@ -4,7 +4,7 @@ type Consumer struct {
 	Bus      string `json:"bus,omitempty"`
 	Topic    string `json:"topic,omitempty"`
 	Channel  string `json:"channel,omitempty"`
-	Received int    `json:"received"`
+	Received int32  `json:"received"`
 }
 
 type Producer struct {
